@@ -38,6 +38,12 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install bats-core
 
+      - name: Install bash 4+ (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install bash
+          echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
+
       - name: Run smoke test
         run: make test-smoke
 
@@ -55,6 +61,12 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install bash 4+ (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install bash
+          echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
 
       - name: Test install script
         run: |
