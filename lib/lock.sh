@@ -34,6 +34,15 @@ lock_acquire() {
         printf 'pid: %s\n' "$$"
         printf 'host: %s\n' "$(detect_device)"
         printf 'started-at: %s\n' "$(now_iso)"
+        # Current task from handoff.md (for campsite peek)
+        local task
+        task="$(field_value "$project_root/handoff.md" "task" 2>/dev/null || true)"
+        [[ -n "$task" ]] && printf 'task: %s\n' "$task"
+        # Terminal identifier (for multi-terminal disambiguation)
+        local _tty
+        _tty="$(tty 2>/dev/null)" || _tty="unknown"
+        [[ "$_tty" == "not a tty" ]] && _tty="non-interactive"
+        printf 'terminal: %s\n' "$_tty"
     } > "$lock_file"
 }
 

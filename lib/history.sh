@@ -63,3 +63,51 @@ history_recent() {
 
     tail -"$count" "$hfile"
 }
+
+# Return deduplicated MRU project list (most recent first)
+# Each line: project_name,timestamp
+history_mru_projects() {
+    local count="${1:-10}"
+    local hfile
+    hfile="$(_history_file)"
+    [[ -f "$hfile" ]] || return 1
+
+    # Skip CSV header, reverse, deduplicate keeping first (most recent), limit
+    tail -n +2 "$hfile" | tac 2>/dev/null | awk -F',' '!seen[$1]++ {print $1","$4}' | head -"$count"
+}
+
+# Resolve a project name back to its absolute path via workspace scan
+history_resolve_project_path() {
+    local name="$1"
+    local workspace
+    workspace="$(detect_workspace 2>/dev/null)" || return 1
+
+    while IFS= read -r project; do
+        if [[ "$(basename "$project")" == "$name" ]]; then
+            printf '%s' "$project"
+            return 0
+        fi
+    done < <(detect_all_projects "$workspace" 2>/dev/null)
+
+    return 1
+}
+
+# Return human-readable relative time string
+_history_relative_time() {
+    local timestamp="$1"
+    local sync_epoch now_epoch elapsed
+
+    sync_epoch="$(date -d "$timestamp" +%s 2>/dev/null \
+        || date -j -f '%Y-%m-%dT%H:%M:%SZ' "$timestamp" +%s 2>/dev/null \
+        || echo 0)"
+    now_epoch="$(date +%s)"
+    elapsed=$(( now_epoch - sync_epoch ))
+
+    if [[ $elapsed -lt 3600 ]]; then
+        printf '%dm ago' "$(( elapsed / 60 ))"
+    elif [[ $elapsed -lt 86400 ]]; then
+        printf '%dh ago' "$(( elapsed / 3600 ))"
+    else
+        printf '%dd ago' "$(( elapsed / 86400 ))"
+    fi
+}

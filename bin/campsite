@@ -46,16 +46,19 @@ fi
 
 usage() {
     local version
-    version="$(cat "$CAMPSITE_ROOT/version" 2>/dev/null || cat "$CAMPSITE_ROOT/VERSION" 2>/dev/null || echo "dev")"
+    version="$(cat "$CAMPSITE_ROOT/VERSION" 2>/dev/null || cat "$CAMPSITE_ROOT/version" 2>/dev/null || echo "dev")"
     cat <<EOF
 campsite $version — project state compiler for AI coding agents
 
 usage:
   campsite                Interactive launcher
+  campsite setup          First-run guided setup
   campsite init [path]    Bootstrap a new campsite project
   campsite sync           Compile source of truth → agent context files
   campsite save           Verify updates + cleanup + unlock
   campsite status         Current project state summary
+  campsite peek           View active session from another terminal
+  campsite go [name|#]    Jump to recent project (cd + optional sync)
   campsite validate       Structure + freshness verification
   campsite recover        Clear orphaned locks + stale files
   campsite dashboard      All projects overview
@@ -341,7 +344,8 @@ _validate_project() {
 
     # Required files
     for file in README.md status.md handoff.md decisions.md; do
-        [[ -f "$project/$file" ]] || fail "missing: $project/$file"
+        [[ -f "$project/$file" ]] || fail "missing: $project/$file" \
+            "Run 'campsite init' to scaffold project files"
     done
 
     # Header checks
@@ -354,7 +358,8 @@ _validate_project() {
     [[ -n "$phase" ]] || fail "missing status phase"
     case "$phase" in
         discovery|building|testing|reviewing|blocked|deployed) ;;
-        *) fail "invalid phase: $phase" ;;
+        *) fail "invalid phase: $phase" \
+            "Valid: discovery, building, testing, reviewing, blocked, deployed" ;;
     esac
 
     # Task validation
@@ -461,7 +466,8 @@ cmd_dashboard() {
     workspace="$(detect_workspace 2>/dev/null)" || true
 
     if [[ -z "$workspace" ]]; then
-        fail "no workspace found. Set CAMPSITE_WORKSPACE or create WORKSPACE.md in a parent directory."
+        fail "no workspace found" \
+            "Run 'campsite setup' or 'campsite workspace set <path>'"
     fi
 
     printf '\n'
@@ -501,6 +507,225 @@ cmd_dashboard() {
     printf '\n'
 }
 
+# --- campsite setup — first-run guided onboarding ---
+cmd_setup() {
+    printf '\n'
+    printf "  ${_C_BOLD:-}campsite setup${_C_RESET:-} — initial configuration\n\n"
+
+    # Step 1: Workspace
+    printf "  ${_C_BOLD:-}Step 1: Workspace${_C_RESET:-}\n"
+    printf "  Where are your projects stored?\n"
+
+    local ws_default="${CAMPSITE_WORKSPACE:-$HOME/projects}"
+    local ws_path
+    ws_path="$(ui_path_prompt "path" "$ws_default")" || exit 1
+    printf '\n'
+
+    cmd_workspace_set "$ws_path"
+    printf '\n'
+
+    # Step 2: Detect existing projects
+    printf "  ${_C_BOLD:-}Step 2: Projects${_C_RESET:-}\n"
+    local project_count=0
+    while IFS= read -r dir; do
+        local pname
+        pname="$(basename "$dir")"
+        local has_status="" has_handoff=""
+        [[ -f "$dir/status.md" ]] && has_status="${_C_GREEN:-}✓${_C_RESET:-}" || has_status="${_C_RED:-}✗${_C_RESET:-}"
+        [[ -f "$dir/handoff.md" ]] && has_handoff="${_C_GREEN:-}✓${_C_RESET:-}" || has_handoff="${_C_RED:-}✗${_C_RESET:-}"
+        printf "    %b  %-20s  (status.md %b  handoff.md %b)\n" \
+            "${_C_DIM:-}$((project_count + 1))${_C_RESET:-}" "$pname" "$has_status" "$has_handoff"
+        project_count=$((project_count + 1))
+    done < <(detect_all_projects "$ws_path" 2>/dev/null || true)
+
+    if [[ $project_count -eq 0 ]]; then
+        printf "  No campsite projects found.\n"
+    else
+        printf "  Found %d project(s).\n" "$project_count"
+    fi
+
+    printf '\n'
+    if ui_confirm "Initialize a new project?"; then
+        local new_path
+        new_path="$(ui_path_prompt "project path" "$ws_path/my-project")" || true
+        if [[ -n "$new_path" ]]; then
+            cmd_init "$new_path"
+        fi
+    fi
+    printf '\n'
+
+    # Step 3: Check available agents
+    printf "  ${_C_BOLD:-}Step 3: Agents${_C_RESET:-}\n"
+    printf "  Checking installed agents...\n"
+    while IFS= read -r adapter_name; do
+        local adapter_file
+        adapter_file="$(_adapter_find "$adapter_name" 2>/dev/null)" || continue
+        local cmd
+        cmd="$(field_value_plain "$adapter_file" "command")"
+        if command -v "$cmd" >/dev/null 2>&1; then
+            local cmd_path
+            cmd_path="$(command -v "$cmd")"
+            printf "    ${_C_GREEN:-}✓${_C_RESET:-} %-10s (%s)\n" "$adapter_name" "$cmd_path"
+        else
+            printf "    ${_C_RED:-}✗${_C_RESET:-} %-10s (not found)\n" "$adapter_name"
+        fi
+    done < <(adapter_list 2>/dev/null || true)
+
+    printf '\n'
+
+    # Mark setup complete
+    local global_dir
+    global_dir="$(campsite_global_dir)"
+    printf '%s\n' "$(now_iso)" > "$global_dir/setup-complete"
+
+    info "setup complete. Run 'campsite' to start a session."
+    printf '\n'
+}
+
+# --- campsite peek — view active session from another terminal ---
+cmd_peek() {
+    local live=0
+    for arg in "$@"; do
+        [[ "$arg" == "--live" ]] && live=1
+    done
+
+    local project
+    project="$(detect_project)"
+    local name
+    name="$(basename "$project")"
+
+    _peek_print() {
+        local lock_file
+        lock_file="$(lock_path "$project")"
+
+        if [[ ! -f "$lock_file" ]]; then
+            printf '\n'
+            printf "  ${_C_DIM:-}%s${_C_RESET:-} — no active session\n\n" "$name"
+            return 1
+        fi
+
+        local actor tool pid host started task terminal
+        actor="$(field_value_plain "$lock_file" "actor" 2>/dev/null || echo "?")"
+        tool="$(field_value_plain "$lock_file" "tool" 2>/dev/null || echo "?")"
+        pid="$(field_value_plain "$lock_file" "pid" 2>/dev/null || echo "?")"
+        host="$(field_value_plain "$lock_file" "host" 2>/dev/null || echo "?")"
+        started="$(field_value_plain "$lock_file" "started-at" 2>/dev/null || echo "?")"
+        task="$(field_value_plain "$lock_file" "task" 2>/dev/null || echo "?")"
+        terminal="$(field_value_plain "$lock_file" "terminal" 2>/dev/null || echo "?")"
+
+        # Elapsed time
+        local elapsed_str="?"
+        if [[ "$started" != "?" ]]; then
+            local start_epoch now_epoch elapsed
+            start_epoch="$(date -d "$started" +%s 2>/dev/null \
+                || date -j -f '%Y-%m-%dT%H:%M:%SZ' "$started" +%s 2>/dev/null \
+                || echo 0)"
+            now_epoch="$(date +%s)"
+            elapsed=$(( now_epoch - start_epoch ))
+            if [[ $elapsed -lt 3600 ]]; then
+                elapsed_str="${elapsed_str:+}$((elapsed / 60))m"
+            else
+                elapsed_str="$((elapsed / 3600))h $((elapsed % 3600 / 60))m"
+            fi
+        fi
+
+        # PID alive check
+        local pid_status
+        if [[ "$pid" != "?" ]] && kill -0 "$pid" 2>/dev/null; then
+            pid_status="${_C_GREEN:-}running${_C_RESET:-}"
+        else
+            pid_status="${_C_RED:-}dead${_C_RESET:-}"
+        fi
+
+        printf '\n'
+        printf "  ${_C_BOLD:-}%s${_C_RESET:-} — active session\n\n" "$name"
+        printf "  agent:     %s\n" "$tool"
+        printf "  user:      %s\n" "$actor"
+        printf "  device:    %s\n" "$host"
+        printf "  terminal:  %s\n" "$terminal"
+        printf "  started:   %s (%s)\n" "$started" "$elapsed_str"
+        printf "  task:      %s\n" "$task"
+        printf "  pid:       %s (%b)\n" "$pid" "$pid_status"
+        printf '\n'
+    }
+
+    if [[ $live -eq 1 ]]; then
+        while true; do
+            clear
+            _peek_print || break
+            sleep 5
+        done
+    else
+        _peek_print
+    fi
+}
+
+# --- campsite go [name|number] [--sync] — quick-jump to recent project ---
+cmd_go() {
+    local target="" do_sync=0
+    for arg in "$@"; do
+        case "$arg" in
+            --sync) do_sync=1 ;;
+            *) target="$arg" ;;
+        esac
+    done
+
+    # Build MRU list
+    local -a mru_names=()
+    local -a mru_times=()
+    while IFS=',' read -r pname ptime; do
+        mru_names+=("$pname")
+        mru_times+=("$ptime")
+    done < <(history_mru_projects 10 2>/dev/null || true)
+
+    if [[ ${#mru_names[@]} -eq 0 ]]; then
+        fail "no project history yet" \
+             "Run 'campsite sync' in a project first, or 'campsite setup'"
+    fi
+
+    local resolved_path=""
+
+    if [[ -z "$target" ]]; then
+        # Interactive: show MRU list
+        printf '\n'
+        printf "  ${_C_BOLD:-}Recent projects:${_C_RESET:-}\n"
+        local idx=1
+        for i in "${!mru_names[@]}"; do
+            local rel_time=""
+            [[ -n "${mru_times[$i]}" ]] && rel_time="$(_history_relative_time "${mru_times[$i]}" 2>/dev/null || echo "?")"
+            printf "  ${_C_DIM:-}%2d${_C_RESET:-}  %-20s  (%s)\n" "$idx" "${mru_names[$i]}" "$rel_time"
+            idx=$((idx + 1))
+        done
+        printf '\n'
+
+        local selection
+        selection="$(ui_select "project" "${#mru_names[@]}" "1")"
+        target="${mru_names[$((selection - 1))]}"
+    elif [[ "$target" =~ ^[0-9]+$ ]]; then
+        # Numeric index into MRU
+        if [[ "$target" -ge 1 && "$target" -le "${#mru_names[@]}" ]]; then
+            target="${mru_names[$((target - 1))]}"
+        else
+            fail "invalid index: $target (have ${#mru_names[@]} projects)"
+        fi
+    fi
+
+    # Resolve name to full path
+    resolved_path="$(history_resolve_project_path "$target" 2>/dev/null)" || {
+        # Try detect_project from name match
+        fail "cannot find project: $target" \
+             "Check workspace path with 'campsite dashboard'"
+    }
+
+    # If --sync requested, compile first
+    if [[ $do_sync -eq 1 ]]; then
+        (cd "$resolved_path" && cmd_sync)
+    fi
+
+    # Print path to stdout (shell wrapper does the cd)
+    printf '%s' "$resolved_path"
+}
+
 # --- campsite workspace set <path> ---
 cmd_workspace_set() {
     [[ $# -ge 1 ]] || fail "usage: campsite workspace set <path>"
@@ -515,9 +740,8 @@ cmd_workspace_set() {
     local config_file="$global_dir/user/config.sh"
 
     if [[ -f "$config_file" ]] && grep -q 'CAMPSITE_WORKSPACE=' "$config_file"; then
-        # Update existing
-        sed -i.bak "s|^.*CAMPSITE_WORKSPACE=.*|CAMPSITE_WORKSPACE=\"$ws_path\"|" "$config_file"
-        rm -f "${config_file}.bak"
+        # Update existing (portable: no sed -i)
+        _portable_sed_i "s|^.*CAMPSITE_WORKSPACE=.*|CAMPSITE_WORKSPACE=\"$ws_path\"|" "$config_file"
     else
         printf '\nCAMPSITE_WORKSPACE="%s"\n' "$ws_path" >> "$config_file"
     fi
@@ -539,7 +763,14 @@ _deprecated() {
 main() {
     case "${1:-}" in
         "")
+            # First-run detection
+            if [[ ! -f "$(campsite_global_dir)/setup-complete" ]]; then
+                warn "first time? Run 'campsite setup' to configure your workspace."
+            fi
             cmd_launcher
+            ;;
+        setup)
+            shift; cmd_setup "$@"
             ;;
         init)
             shift; cmd_init "$@"
@@ -552,6 +783,12 @@ main() {
             ;;
         status)
             shift; cmd_status "$@"
+            ;;
+        peek)
+            shift; cmd_peek "$@"
+            ;;
+        go)
+            shift; cmd_go "$@"
             ;;
         validate)
             shift; cmd_validate "$@"
@@ -570,8 +807,8 @@ main() {
             esac
             ;;
         --version|-v)
-            cat "$CAMPSITE_ROOT/version" 2>/dev/null \
-                || cat "$CAMPSITE_ROOT/VERSION" 2>/dev/null \
+            cat "$CAMPSITE_ROOT/VERSION" 2>/dev/null \
+                || cat "$CAMPSITE_ROOT/version" 2>/dev/null \
                 || echo "dev"
             ;;
         help|-h|--help)
@@ -588,7 +825,7 @@ main() {
             _deprecated "$1" "campsite (launcher, then select $1)"
             ;;
         *)
-            fail "unknown command: $1. Run 'campsite help' for usage."
+            fail "unknown command: $1" "Run 'campsite help' for usage."
             ;;
     esac
 }

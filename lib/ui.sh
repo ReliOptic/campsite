@@ -35,7 +35,8 @@ ui_project_list() {
     done < <(detect_all_projects 2>/dev/null || true)
 
     if [[ ${#projects[@]} -eq 0 ]]; then
-        fail "no campsite projects found"
+        fail "no campsite projects found" \
+             "Run 'campsite setup' to configure workspace, or 'campsite init <path>'"
     fi
 
     # Ghost suggestion: last used project
@@ -83,7 +84,7 @@ ui_project_list() {
         printf "  ${_C_DIM}%2d${_C_RESET}  %-20s │ %-10s │ %b%b%b\n" \
             "$i" "$name" "$phase" "$status_indicator" "$stale_warn" "$ghost"
 
-        ((i++))
+        i=$((i + 1))
     done
     printf '\n'
 }
@@ -112,7 +113,8 @@ ui_agent_list() {
     done < <(adapter_list 2>/dev/null || true)
 
     if [[ ${#agents[@]} -eq 0 ]]; then
-        fail "no agent commands found in PATH. Install an AI coding agent (claude, codex, gemini, etc.)"
+        fail "no agent commands found in PATH" \
+             "Install an AI coding agent: claude, codex, gemini, cursor, copilot"
     fi
 
     AGENT_LIST=("${agents[@]}")
@@ -125,7 +127,7 @@ ui_agent_list() {
             ghost=" ${_C_DIM}← default${_C_RESET}"
         fi
         printf "  ${_C_DIM}%2d${_C_RESET}  %s%b\n" "$i" "$adapter" "$ghost"
-        ((i++))
+        i=$((i + 1))
     done
     printf '\n'
 }
@@ -137,28 +139,37 @@ ui_select() {
     local prompt="$1"
     local size="$2"
     local default="${3:-0}"
+    local max_retries=3
+    local attempt=0
 
     local default_hint=""
     if [[ $default -gt 0 ]]; then
         default_hint=" ${_C_DIM}[${default}]${_C_RESET}"
     fi
 
-    printf "  %b%b: " "$prompt" "$default_hint"
-    read -r choice
+    while [[ $attempt -lt $max_retries ]]; do
+        printf "  %b%b: " "$prompt" "$default_hint"
+        read -r choice
 
-    # Empty = default
-    if [[ -z "$choice" && $default -gt 0 ]]; then
-        printf '%d' "$default"
-        return 0
-    fi
+        # Empty = default
+        if [[ -z "$choice" && $default -gt 0 ]]; then
+            printf '%d' "$default"
+            return 0
+        fi
 
-    # Validate numeric
-    if [[ "$choice" =~ ^[0-9]+$ ]] && [[ "$choice" -ge 1 ]] && [[ "$choice" -le "$size" ]]; then
-        printf '%d' "$choice"
-        return 0
-    fi
+        # Validate numeric and in range
+        if [[ "$choice" =~ ^[0-9]+$ ]] && [[ "$choice" -ge 1 ]] && [[ "$choice" -le "$size" ]]; then
+            printf '%d' "$choice"
+            return 0
+        fi
 
-    fail "invalid selection: $choice"
+        attempt=$((attempt + 1))
+        if [[ $attempt -lt $max_retries ]]; then
+            warn "invalid input '${choice}'. Enter a number 1-${size}."
+        fi
+    done
+
+    fail "too many invalid selections"
 }
 
 # Yes/No confirmation
@@ -189,6 +200,44 @@ ui_banner() {
     printf "  phase: %s\n" "$phase"
     printf "  next: %s\n" "$task"
     printf '\n'
+}
+
+# Prompt for a filesystem path with a default
+# Expands ~ and validates directory exists (or offers to create)
+ui_path_prompt() {
+    local prompt="$1"
+    local default="${2:-}"
+
+    local hint=""
+    [[ -n "$default" ]] && hint=" ${_C_DIM}[${default}]${_C_RESET}"
+
+    printf "  %b%b: " "$prompt" "$hint"
+    read -r input
+
+    # Use default if empty
+    [[ -z "$input" && -n "$default" ]] && input="$default"
+
+    # Expand ~
+    input="${input/#\~/$HOME}"
+
+    # Resolve to absolute path
+    if [[ "$input" != /* ]]; then
+        input="$(cd "$input" 2>/dev/null && pwd)" || {
+            fail "cannot access: $input"
+        }
+    fi
+
+    # Validate or create
+    if [[ ! -d "$input" ]]; then
+        printf "  directory does not exist: %s\n" "$input"
+        if ui_confirm "Create it?"; then
+            mkdir -p "$input"
+        else
+            return 1
+        fi
+    fi
+
+    printf '%s' "$input"
 }
 
 # Full interactive launcher flow

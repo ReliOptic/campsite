@@ -66,6 +66,13 @@ portable_stat_mtime() {
     esac
 }
 
+# Portable in-place sed (works on both GNU and BSD sed)
+_portable_sed_i() {
+    local expression="$1" file="$2"
+    local tmpfile="${file}.campsite_tmp"
+    sed "$expression" "$file" > "$tmpfile" && mv "$tmpfile" "$file"
+}
+
 # Returns 0 if stdout is a terminal (supports colors/ANSI)
 is_terminal() {
     [[ -t 1 ]]

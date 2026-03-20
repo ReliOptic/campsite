@@ -93,9 +93,9 @@ install_files() {
 
     # Write version
     if [[ -f "$src/VERSION" ]]; then
-        cp "$src/VERSION" "$CAMPSITE_HOME/version"
+        cp "$src/VERSION" "$CAMPSITE_HOME/VERSION"
     else
-        printf 'dev\n' > "$CAMPSITE_HOME/version"
+        printf 'dev\n' > "$CAMPSITE_HOME/VERSION"
     fi
 
     # Create user config if not exists
@@ -117,7 +117,20 @@ setup_path() {
     shell_block='
 # Campsite
 export CAMPSITE_HOME="$HOME/.campsite"
-export PATH="$CAMPSITE_HOME/bin:$PATH"'
+export PATH="$CAMPSITE_HOME/bin:$PATH"
+# Shell wrapper for campsite go (cd requires same-shell execution)
+campsite() {
+    if [[ "${1:-}" == "go" ]]; then
+        local target
+        target="$(command campsite "$@")" || return $?
+        if [[ -n "$target" && -d "$target" ]]; then
+            cd "$target" || return 1
+            printf "  \033[32m✓\033[0m jumped to: %s\n" "$target"
+            return 0
+        fi
+    fi
+    command campsite "$@"
+}'
 
     local modified=0
 
@@ -138,11 +151,38 @@ export PATH="$CAMPSITE_HOME/bin:$PATH"'
     fi
 }
 
+# --- Dependency check ---
+check_dependencies() {
+    local missing=()
+
+    # Bash version (need 4+ for associative arrays)
+    if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
+        missing+=("bash 4+ (current: $BASH_VERSION)")
+    fi
+
+    # Required tools
+    for tool in sed awk; do
+        command -v "$tool" >/dev/null 2>&1 || missing+=("$tool")
+    done
+
+    # SHA256 (any one of these)
+    if ! command -v sha256sum >/dev/null 2>&1 && \
+       ! command -v shasum >/dev/null 2>&1 && \
+       ! command -v openssl >/dev/null 2>&1; then
+        missing+=("sha256sum or shasum or openssl")
+    fi
+
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        fail "missing dependencies: ${missing[*]}"
+    fi
+}
+
 # --- Main ---
 main() {
     info "campsite installer"
     printf '\n'
 
+    check_dependencies
     detect_source
 
     if [[ "$SOURCE_MODE" == "remote" ]]; then
@@ -153,7 +193,7 @@ main() {
     setup_path
 
     local version
-    version="$(cat "$CAMPSITE_HOME/version" 2>/dev/null || echo 'unknown')"
+    version="$(cat "$CAMPSITE_HOME/VERSION" 2>/dev/null || cat "$CAMPSITE_HOME/version" 2>/dev/null || echo 'unknown')"
 
     printf '\n'
     info "campsite $version installed to $CAMPSITE_HOME"

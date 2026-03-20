@@ -5,6 +5,9 @@ _CAMPSITE_COMMON_LOADED=1
 
 fail() {
     printf '\033[31merror:\033[0m %s\n' "$1" >&2
+    if [[ -n "${2:-}" ]]; then
+        printf '  \033[2mhint:\033[0m %s\n' "$2" >&2
+    fi
     exit 1
 }
 

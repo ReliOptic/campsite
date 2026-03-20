@@ -22,10 +22,11 @@ detect_project() {
         parent="$(dirname "$dir")"
         [[ "$parent" == "$dir" ]] && break  # reached root
         dir="$parent"
-        ((i++))
+        i=$((i + 1))
     done
 
-    fail "no campsite project found (walked up $i levels from $start)"
+    fail "no campsite project found (walked up $i levels from $start)" \
+         "Ensure status.md and handoff.md exist, or run 'campsite init'"
 }
 
 # Walk up from a directory to find a workspace root
@@ -63,7 +64,7 @@ detect_workspace() {
         parent="$(dirname "$dir")"
         [[ "$parent" == "$dir" ]] && break
         dir="$parent"
-        ((i++))
+        i=$((i + 1))
     done
 
     return 1
@@ -89,7 +90,7 @@ detect_all_projects() {
         [[ -d "$dir" ]] || continue
         if [[ -f "$dir/status.md" && -f "$dir/handoff.md" ]]; then
             printf '%s\n' "${dir%/}"
-            ((found++))
+            found=$((found + 1))
         fi
     done
 
@@ -99,10 +100,11 @@ detect_all_projects() {
             [[ -d "$dir" ]] || continue
             if [[ -f "$dir/status.md" && -f "$dir/handoff.md" ]]; then
                 printf '%s\n' "${dir%/}"
-                ((found++))
+                found=$((found + 1))
             fi
         done
     fi
 
-    [[ $found -gt 0 ]] || fail "no campsite projects found under $root"
+    [[ $found -gt 0 ]] || fail "no campsite projects found under $root" \
+        "Run 'campsite init <path>' to create a project, or check workspace path"
 }

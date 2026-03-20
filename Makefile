@@ -31,7 +31,7 @@ install:
 	@if [ -f config/defaults.sh ]; then \
 		cp config/defaults.sh "$(PREFIX)/config/defaults.sh"; \
 	fi
-	@printf '%s\n' "$(VERSION)" > "$(PREFIX)/version"
+	@printf '%s\n' "$(VERSION)" > "$(PREFIX)/VERSION"
 	@if [ ! -f "$(PREFIX)/user/config.sh" ]; then \
 		printf '%s\n' '#!/usr/bin/env bash' \
 			'# Campsite user configuration' \
@@ -45,7 +45,7 @@ install:
 
 uninstall:
 	@rm -rf "$(PREFIX)/bin" "$(PREFIX)/lib" "$(PREFIX)/adapters" \
-		"$(PREFIX)/templates" "$(PREFIX)/config" "$(PREFIX)/version"
+		"$(PREFIX)/templates" "$(PREFIX)/config" "$(PREFIX)/VERSION"
 	@printf '\033[32m%s\033[0m\n' "campsite removed from $(PREFIX)"
 	@printf '%s\n' "User config preserved at $(PREFIX)/user/"
 	@printf '%s\n' "Remove PATH entries from your shell profile manually."
@@ -70,7 +70,7 @@ dev:
 	@if [ -f "$(CURDIR)/config/defaults.sh" ]; then \
 		ln -sf "$(CURDIR)/config/defaults.sh" "$(PREFIX)/config/defaults.sh"; \
 	fi
-	@printf '%s\n' "$(VERSION)" > "$(PREFIX)/version"
+	@printf '%s\n' "$(VERSION)" > "$(PREFIX)/VERSION"
 	@printf '\033[32m%s\033[0m\n' "campsite dev mode: $(PREFIX) -> $(CURDIR)"
 
 test:
