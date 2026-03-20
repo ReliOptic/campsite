@@ -591,9 +591,29 @@ cmd_setup() {
     abs_path="$(_setup_normalize_path "$raw_path")"
     printf '\n'
 
-    # --- Infer intent ---
+    # --- Infer intent (loop handles new-invalid fallback without re-prompting) ---
     local path_type
     path_type="$(_setup_infer_type "$abs_path")"
+
+    # Resolve new-invalid once before branching
+    if [[ "$path_type" == "new-invalid" ]]; then
+        printf "  I could not use that path — its parent does not exist:\n"
+        printf "    ${_C_DIM:-}%s${_C_RESET:-}\n\n" "$(dirname "$abs_path")"
+        printf "  Try one of these instead:\n"
+        printf "    1) Use current folder: %s\n" "$(pwd)"
+        printf "    2) Use home projects:  %s\n" "$HOME/projects"
+        printf "    3) Enter another path\n"
+        printf '\n  Choice [1]: '
+        read -r choice
+        case "${choice:-1}" in
+            2) abs_path="$HOME/projects"; mkdir -p "$abs_path" ;;
+            3) printf '  Path: '; read -r abs_path
+               abs_path="$(_setup_normalize_path "$abs_path")" ;;
+            *) abs_path="$(pwd)" ;;
+        esac
+        printf '\n'
+        path_type="$(_setup_infer_type "$abs_path")"
+    fi
 
     local ws_path="" proj_path="" do_init=0
 
@@ -648,25 +668,12 @@ cmd_setup() {
             fi
             ;;
 
-        new-invalid)
-            printf "  I could not use that path — its parent does not exist:\n"
-            printf "    ${_C_DIM:-}%s${_C_RESET:-}\n\n" "$(dirname "$abs_path")"
-            printf "  Try one of these instead:\n"
-            printf "    1) Use current folder: %s\n" "$(pwd)"
-            printf "    2) Use home projects:  %s\n" "$HOME/projects"
-            printf "    3) Enter another path\n"
-            printf '\n  Choice [1]: '
-            read -r choice
-            case "${choice:-1}" in
-                2) abs_path="$HOME/projects"; mkdir -p "$abs_path" ;;
-                3) printf '  Path: '; read -r abs_path
-                   abs_path="$(_setup_normalize_path "$abs_path")" ;;
-                *) abs_path="$(pwd)" ;;
-            esac
-            printf '\n'
-            # Recurse with resolved path
-            CAMPSITE_WORKSPACE="$abs_path" cmd_setup
-            return $?
+        *)
+            # Still invalid after one correction — fall back to current dir
+            abs_path="$(pwd)"
+            ws_path="$abs_path"
+            printf "  Using current folder as workspace:\n"
+            printf "    ${_C_BOLD:-}%s${_C_RESET:-}\n\n" "$ws_path"
             ;;
     esac
 
