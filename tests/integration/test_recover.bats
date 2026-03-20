@@ -13,13 +13,13 @@ teardown() {
 }
 
 @test "recover clears orphaned lock with dead PID" {
-    # Create a lock with a non-existent PID
+    # Create a lock with a non-existent PID on the current host
     mkdir -p "$TEST_PROJECT/.campsite"
-    cat > "$TEST_PROJECT/.campsite/lock" << 'EOF'
+    cat > "$TEST_PROJECT/.campsite/lock" << EOF
 actor: olduser
 tool: claude
 pid: 99999999
-host: old-machine
+host: $(hostname)
 started-at: 2026-03-01T00:00:00Z
 EOF
     
