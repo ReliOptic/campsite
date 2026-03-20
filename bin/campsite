@@ -1,0 +1,356 @@
+#!/usr/bin/env sh
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+PROJECT_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+TEMPLATE_ROOT="$PROJECT_ROOT/templates"
+WORKSPACE_ROOT=$(CDPATH= cd -- "$PROJECT_ROOT/../.." && pwd)
+STALE_DAYS=${CAMPSITE_STALE_DAYS:-2}
+CONTEXT_DIR_NAME=.campsite
+
+usage() {
+  printf '%s\n' \
+    "campsite - lightweight session checkpoint harness" \
+    "" \
+    "usage:" \
+    "  campsite init /abs/path/to/project" \
+    "  campsite validate /abs/path/to/project" \
+    "  campsite context /abs/path/to/project" \
+    "  campsite enter /abs/path/to/project [actor]" \
+    "  campsite resume /abs/path/to/project" \
+    "  campsite handoff /abs/path/to/project" \
+    "  campsite leave /abs/path/to/project" \
+    "  campsite summary [/abs/path/to/projects-root]" \
+    "  campsite claude /abs/path/to/project [tool-args...]" \
+    "  campsite codex /abs/path/to/project [tool-args...]" \
+    "  campsite gemini /abs/path/to/project [tool-args...]" \
+    "  campsite openclaw /abs/path/to/project [tool-args...]" \
+    "  campsite help"
+}
+
+fail() {
+  printf '%s\n' "$1" >&2
+  exit 1
+}
+
+require_abs_path() {
+  case $1 in
+    /*) ;;
+    *) fail "path must be absolute: $1" ;;
+  esac
+}
+
+slug_from_path() {
+  basename "$1" \
+    | tr '[:upper:]' '[:lower:]' \
+    | sed -e 's/[^a-z0-9]/-/g' -e 's/-\{2,\}/-/g' -e 's/^-//' -e 's/-$//'
+}
+
+lock_path() {
+  printf '%s/.campsite.lock\n' "$1"
+}
+
+write_lock() {
+  project_root=$1
+  actor=$2
+  tool_name=$3
+  lock_file=$(lock_path "$project_root")
+  hostname_value=$(hostname 2>/dev/null || printf '%s' unknown-host)
+  started_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+
+  if [ -e "$lock_file" ]; then
+    printf '%s\n' "lock exists: $lock_file" >&2
+    sed -n '1,20p' "$lock_file" >&2
+    exit 1
+  fi
+
+  {
+    printf 'actor: %s\n' "$actor"
+    printf 'tool: %s\n' "$tool_name"
+    printf 'pid: %s\n' "$$"
+    printf 'host: %s\n' "$hostname_value"
+    printf 'started-at: %s\n' "$started_at"
+  } > "$lock_file"
+}
+
+remove_lock() {
+  project_root=$1
+  lock_file=$(lock_path "$project_root")
+  rm -f "$lock_file"
+}
+
+field_value() {
+  file_path=$1
+  field_name=$2
+  sed -n "s/^[[:space:]]*-[[:space:]]*${field_name}:[[:space:]]*//p" "$file_path" | head -n 1
+}
+
+require_fresh_file() {
+  file_path=$1
+  label=$2
+
+  if find "$file_path" -mtime +"$STALE_DAYS" | grep -q .; then
+    fail "stale ${label}: $file_path"
+  fi
+}
+
+context_dir() {
+  printf '%s/%s\n' "$1" "$CONTEXT_DIR_NAME"
+}
+
+context_file_path() {
+  printf '%s/session-context.md\n' "$(context_dir "$1")"
+}
+
+build_context_file() {
+  project_root=$1
+  project_name=$(basename "$project_root")
+  lock_file=$(lock_path "$project_root")
+  out_file=$(context_file_path "$project_root")
+  mkdir -p "$(context_dir "$project_root")"
+
+  {
+    printf '# Campsite Session Context - %s\n\n' "$project_name"
+    printf '## Read Order\n\n'
+    printf '1. %s/WORKSPACE.md\n' "$WORKSPACE_ROOT"
+    printf '2. %s/README.md\n' "$project_root"
+    printf '3. %s/status.md\n' "$project_root"
+    printf '4. %s/handoff.md\n\n' "$project_root"
+    printf '## Workspace Rules\n\n'
+    sed -n '1,120p' "$WORKSPACE_ROOT/WORKSPACE.md"
+    printf '\n## Project Summary\n\n'
+    sed -n '1,160p' "$project_root/README.md"
+    printf '\n## Current Status\n\n'
+    sed -n '1,200p' "$project_root/status.md"
+    printf '\n## Current Handoff\n\n'
+    sed -n '1,220p' "$project_root/handoff.md"
+    if [ -f "$lock_file" ]; then
+      printf '\n## Active Lock\n\n'
+      sed -n '1,40p' "$lock_file"
+    fi
+  } > "$out_file"
+
+  printf '%s\n' "$out_file"
+}
+
+render_if_missing() {
+  src=$1
+  dst=$2
+  slug=$3
+  title=$4
+  today=$5
+
+  if [ ! -e "$dst" ]; then
+    sed \
+      -e "s/project-name/$slug/g" \
+      -e "s/Project Name/$title/g" \
+      -e "s/yyyy-mm-dd/$today/g" \
+      "$src" > "$dst"
+  fi
+}
+
+command_init() {
+  [ "$#" -eq 1 ] || fail "usage: campsite init /abs/path/to/project"
+  project_root=$1
+  require_abs_path "$project_root"
+
+  slug=$(slug_from_path "$project_root")
+  title=$(basename "$project_root")
+  today=$(date -u '+%Y-%m-%d')
+
+  mkdir -p "$project_root/scripts" "$project_root/docs" "$project_root/src" "$project_root/tests" "$project_root/deploy"
+
+  render_if_missing "$TEMPLATE_ROOT/README.md.template" "$project_root/README.md" "$slug" "$title" "$today"
+  render_if_missing "$TEMPLATE_ROOT/status.md.template" "$project_root/status.md" "$slug" "$title" "$today"
+  render_if_missing "$TEMPLATE_ROOT/handoff.md.template" "$project_root/handoff.md" "$slug" "$title" "$today"
+  render_if_missing "$TEMPLATE_ROOT/decisions.md.template" "$project_root/decisions.md" "$slug" "$title" "$today"
+  render_if_missing "$TEMPLATE_ROOT/gitignore.template" "$project_root/.gitignore" "$slug" "$title" "$today"
+  render_if_missing "$TEMPLATE_ROOT/project-bootstrap.sh.template" "$project_root/scripts/bootstrap.sh" "$slug" "$title" "$today"
+
+  chmod +x "$project_root/scripts/bootstrap.sh"
+  printf '%s\n' "bootstrapped: $project_root"
+}
+
+command_validate() {
+  [ "$#" -eq 1 ] || fail "usage: campsite validate /abs/path/to/project"
+  project_root=$1
+  require_abs_path "$project_root"
+
+  required_paths='README.md status.md handoff.md decisions.md scripts/bootstrap.sh src tests deploy'
+
+  for path in $required_paths; do
+    [ -e "$project_root/$path" ] || fail "missing: $project_root/$path"
+  done
+
+  grep -q "^# Status" "$project_root/status.md" || fail "invalid status.md header"
+  grep -q "^# Handoff" "$project_root/handoff.md" || fail "invalid handoff.md header"
+
+  phase=$(field_value "$project_root/status.md" phase)
+  [ -n "$phase" ] || fail "missing status phase"
+  case $phase in
+    discovery|building|testing|reviewing|blocked|deployed) ;;
+    *) fail "invalid phase: $phase" ;;
+  esac
+
+  task=$(field_value "$project_root/handoff.md" task)
+  [ -n "$task" ] || fail "empty handoff task"
+
+  fallback_task=$(field_value "$project_root/handoff.md" fallback-task || true)
+  : "${fallback_task:=}"
+
+  [ -x "$project_root/scripts/bootstrap.sh" ] || fail "scripts/bootstrap.sh is not executable"
+  require_fresh_file "$project_root/status.md" "status.md"
+  require_fresh_file "$project_root/handoff.md" "handoff.md"
+
+  printf '%s\n' "valid: $project_root"
+}
+
+command_open() {
+  [ "$#" -eq 1 ] || fail "usage: campsite resume /abs/path/to/project"
+  project_root=$1
+  require_abs_path "$project_root"
+
+  printf '%s\n' "project: $project_root"
+  printf '%s\n' "read in order:"
+  printf '%s\n' "1. $WORKSPACE_ROOT/WORKSPACE.md"
+  printf '%s\n' "2. $project_root/README.md"
+  printf '%s\n' "3. $project_root/status.md"
+  printf '%s\n' "4. $project_root/handoff.md"
+  if [ -f "$project_root/.campsite.lock" ]; then
+    printf '%s\n' "lock:"
+    sed -n '1,20p' "$project_root/.campsite.lock"
+  fi
+}
+
+command_context() {
+  [ "$#" -eq 1 ] || fail "usage: campsite context /abs/path/to/project"
+  project_root=$1
+  require_abs_path "$project_root"
+  command_validate "$project_root" >/dev/null
+  build_context_file "$project_root"
+}
+
+command_summary() {
+  [ "$#" -le 1 ] || fail "usage: campsite summary [/abs/path/to/projects-root]"
+  root=${1:-$WORKSPACE_ROOT/projects}
+  require_abs_path "$root"
+
+  for status_file in "$root"/*/status.md; do
+    [ -f "$status_file" ] || continue
+    project_dir=$(dirname "$status_file")
+    project_name=$(basename "$project_dir")
+    phase=$(field_value "$status_file" phase)
+    confidence=$(field_value "$status_file" confidence)
+    printf '%s | %s | %s\n' "$project_name" "$phase" "$confidence"
+  done
+}
+
+command_start() {
+  [ "$#" -ge 1 ] && [ "$#" -le 2 ] || fail "usage: campsite enter /abs/path/to/project [actor]"
+  project_root=$1
+  require_abs_path "$project_root"
+  actor=${2:-${USER:-unknown}}
+
+  command_validate "$project_root" >/dev/null
+  write_lock "$project_root" "$actor" manual
+
+  printf '%s\n' "entered: $project_root"
+  command_open "$project_root"
+}
+
+command_finish() {
+  [ "$#" -eq 1 ] || fail "usage: campsite leave /abs/path/to/project"
+  project_root=$1
+  require_abs_path "$project_root"
+  lock_file=$(lock_path "$project_root")
+
+  [ -e "$lock_file" ] || fail "no lock file: $lock_file"
+  remove_lock "$project_root"
+  printf '%s\n' "left: $project_root"
+  printf '%s\n' "remember to update status.md and handoff.md before commit"
+}
+
+command_handoff() {
+  [ "$#" -eq 1 ] || fail "usage: campsite handoff /abs/path/to/project"
+  project_root=$1
+  require_abs_path "$project_root"
+
+  command_validate "$project_root" >/dev/null
+
+  printf '%s\n' "handoff: $project_root"
+  printf '%s\n' "current status:"
+  sed -n '1,120p' "$project_root/status.md"
+  printf '\n%s\n' "next action:"
+  sed -n '1,160p' "$project_root/handoff.md"
+  printf '\n%s\n' "compiled context:"
+  build_context_file "$project_root"
+}
+
+command_agent() {
+  tool_name=$1
+  shift
+
+  [ "$#" -ge 1 ] || fail "usage: campsite $tool_name /abs/path/to/project [tool-args...]"
+  project_root=$1
+  shift
+  require_abs_path "$project_root"
+
+  if ! command -v "$tool_name" >/dev/null 2>&1; then
+    fail "command not found in PATH: $tool_name"
+  fi
+
+  actor=${USER:-unknown}
+
+  command_validate "$project_root" >/dev/null
+  write_lock "$project_root" "$actor" "$tool_name"
+  context_file=$(build_context_file "$project_root")
+
+  cleanup() {
+    remove_lock "$project_root"
+  }
+
+  trap cleanup EXIT INT TERM HUP
+
+  printf '%s\n' "tool: $tool_name"
+  command_open "$project_root"
+  printf '%s\n' "context-file: $context_file"
+  printf '%s\n' "launching: $tool_name"
+
+  (
+    cd "$project_root"
+    CAMPSITE_PROJECT_ROOT=$project_root \
+    CAMPSITE_WORKSPACE_ROOT=$WORKSPACE_ROOT \
+    CAMPSITE_CONTEXT_FILE=$context_file \
+    CAMPSITE_TOOL=$tool_name \
+    exec "$tool_name" "$@"
+  )
+}
+
+main() {
+  [ "$#" -ge 1 ] || {
+    usage
+    exit 1
+  }
+
+  cmd=$1
+  shift
+
+  case $cmd in
+    init) command_init "$@" ;;
+    validate) command_validate "$@" ;;
+    context) command_context "$@" ;;
+    open|resume) command_open "$@" ;;
+    summary) command_summary "$@" ;;
+    start|enter) command_start "$@" ;;
+    finish|leave) command_finish "$@" ;;
+    handoff) command_handoff "$@" ;;
+    claude) command_agent claude "$@" ;;
+    codex) command_agent codex "$@" ;;
+    gemini) command_agent gemini "$@" ;;
+    openclaw) command_agent openclaw "$@" ;;
+    help|-h|--help) usage ;;
+    *) fail "unknown command: $cmd" ;;
+  esac
+}
+
+main "$@"

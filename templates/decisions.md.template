@@ -1,0 +1,10 @@
+# Decisions - project-name
+
+## [yyyy-mm-dd] Decision title
+
+- Context: why this decision came up
+- Options considered: option A, option B
+- Chosen: option A
+- Rationale: why option A won
+- Revisit if: condition that invalidates the choice
+

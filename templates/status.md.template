@@ -1,0 +1,26 @@
+# Status - project-name
+
+## Current State
+
+- phase: discovery
+- confidence: low
+- last-updated: yyyy-mm-dd
+- last-agent: unknown
+- last-device: unknown
+
+## Active Branch
+
+- branch: main
+- base: none
+
+## What Works
+
+- none yet
+
+## What Does Not Work Yet
+
+- not started
+
+## Blockers
+
+- none
