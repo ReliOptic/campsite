@@ -1,31 +1,79 @@
-.PHONY: help bootstrap validate summary enter leave handoff start finish
+PREFIX ?= $(HOME)/.campsite
+VERSION := $(shell cat VERSION 2>/dev/null || git describe --tags --always 2>/dev/null || echo dev)
+CURDIR := $(shell pwd)
+
+.PHONY: help install uninstall dev test
 
 help:
-\t@printf '%s\n' "Targets:" "  bootstrap PROJECT=/abs/path  scaffold a Campsite project" "  validate PROJECT=/abs/path   validate a Campsite project" "  summary [PROJECTS=/abs/path] list project states" "  enter PROJECT=/abs/path      enter a project checkpoint" "  handoff PROJECT=/abs/path    show current state and next action" "  leave PROJECT=/abs/path      release project session lock"
+	@printf '%s\n' \
+		"campsite $(VERSION)" \
+		"" \
+		"Installation:" \
+		"  make install     Install to $(PREFIX)" \
+		"  make uninstall   Remove from $(PREFIX) (preserves user config)" \
+		"  make dev         Symlink for development (edits go live immediately)" \
+		"" \
+		"Development:" \
+		"  make test        Run basic smoke tests"
 
-bootstrap:
-\t@test -n "$(PROJECT)" || (printf '%s\n' "PROJECT is required"; exit 1)
-\t@sh ./bin/campsite init "$(PROJECT)"
+install:
+	@mkdir -p "$(PREFIX)/bin" "$(PREFIX)/lib" "$(PREFIX)/adapters" \
+		"$(PREFIX)/templates" "$(PREFIX)/config" "$(PREFIX)/user/adapters"
+	@cp bin/campsite "$(PREFIX)/bin/campsite"
+	@chmod +x "$(PREFIX)/bin/campsite"
+	@if [ -d lib ] && ls lib/*.sh >/dev/null 2>&1; then \
+		cp lib/*.sh "$(PREFIX)/lib/"; \
+	fi
+	@if ls adapters/* >/dev/null 2>&1; then \
+		cp adapters/* "$(PREFIX)/adapters/"; \
+	fi
+	@cp templates/* "$(PREFIX)/templates/"
+	@if [ -f config/defaults.sh ]; then \
+		cp config/defaults.sh "$(PREFIX)/config/defaults.sh"; \
+	fi
+	@printf '%s\n' "$(VERSION)" > "$(PREFIX)/version"
+	@if [ ! -f "$(PREFIX)/user/config.sh" ]; then \
+		printf '%s\n' '#!/usr/bin/env bash' \
+			'# Campsite user configuration' \
+			'# CAMPSITE_WORKSPACE="/path/to/workspace"' \
+			> "$(PREFIX)/user/config.sh"; \
+	fi
+	@printf '\033[32m%s\033[0m\n' "campsite $(VERSION) installed to $(PREFIX)"
+	@printf '%s\n' "Ensure $(PREFIX)/bin is in your PATH:"
+	@printf '%s\n' '  export CAMPSITE_HOME="$$HOME/.campsite"'
+	@printf '%s\n' '  export PATH="$$CAMPSITE_HOME/bin:$$PATH"'
 
-validate:
-\t@test -n "$(PROJECT)" || (printf '%s\n' "PROJECT is required"; exit 1)
-\t@sh ./bin/campsite validate "$(PROJECT)"
+uninstall:
+	@rm -rf "$(PREFIX)/bin" "$(PREFIX)/lib" "$(PREFIX)/adapters" \
+		"$(PREFIX)/templates" "$(PREFIX)/config" "$(PREFIX)/version"
+	@printf '\033[32m%s\033[0m\n' "campsite removed from $(PREFIX)"
+	@printf '%s\n' "User config preserved at $(PREFIX)/user/"
+	@printf '%s\n' "Remove PATH entries from your shell profile manually."
 
-summary:
-\t@if [ -n "$(PROJECTS)" ]; then sh ./bin/campsite summary "$(PROJECTS)"; else sh ./bin/campsite summary; fi
+dev:
+	@mkdir -p "$(PREFIX)/bin" "$(PREFIX)/lib" "$(PREFIX)/adapters" \
+		"$(PREFIX)/templates" "$(PREFIX)/config" "$(PREFIX)/user/adapters"
+	@ln -sf "$(CURDIR)/bin/campsite" "$(PREFIX)/bin/campsite"
+	@if [ -d "$(CURDIR)/lib" ]; then \
+		for f in "$(CURDIR)"/lib/*.sh; do \
+			[ -f "$$f" ] && ln -sf "$$f" "$(PREFIX)/lib/$$(basename $$f)"; \
+		done; \
+	fi
+	@if [ -d "$(CURDIR)/adapters" ]; then \
+		for f in "$(CURDIR)"/adapters/*; do \
+			[ -f "$$f" ] && ln -sf "$$f" "$(PREFIX)/adapters/$$(basename $$f)"; \
+		done; \
+	fi
+	@for f in "$(CURDIR)"/templates/*; do \
+		[ -f "$$f" ] && ln -sf "$$f" "$(PREFIX)/templates/$$(basename $$f)"; \
+	done
+	@if [ -f "$(CURDIR)/config/defaults.sh" ]; then \
+		ln -sf "$(CURDIR)/config/defaults.sh" "$(PREFIX)/config/defaults.sh"; \
+	fi
+	@printf '%s\n' "$(VERSION)" > "$(PREFIX)/version"
+	@printf '\033[32m%s\033[0m\n' "campsite dev mode: $(PREFIX) -> $(CURDIR)"
 
-enter:
-\t@test -n "$(PROJECT)" || (printf '%s\n' "PROJECT is required"; exit 1)
-\t@sh ./bin/campsite enter "$(PROJECT)"
-
-handoff:
-\t@test -n "$(PROJECT)" || (printf '%s\n' "PROJECT is required"; exit 1)
-\t@sh ./bin/campsite handoff "$(PROJECT)"
-
-leave:
-\t@test -n "$(PROJECT)" || (printf '%s\n' "PROJECT is required"; exit 1)
-\t@sh ./bin/campsite leave "$(PROJECT)"
-
-start: enter
-
-finish: leave
+test:
+	@printf '%s\n' "Running smoke tests..."
+	@bash bin/campsite --version
+	@printf '\033[32m%s\033[0m\n' "All tests passed"

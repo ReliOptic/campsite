@@ -1,356 +1,571 @@
-#!/usr/bin/env sh
-set -eu
+#!/usr/bin/env bash
+set -euo pipefail
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
-PROJECT_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
-TEMPLATE_ROOT="$PROJECT_ROOT/templates"
-WORKSPACE_ROOT=$(CDPATH= cd -- "$PROJECT_ROOT/../.." && pwd)
-STALE_DAYS=${CAMPSITE_STALE_DAYS:-2}
-CONTEXT_DIR_NAME=.campsite
+# --- Path resolution ---
+# 1. CAMPSITE_HOME env var  2. ~/.campsite/  3. script-relative (dev mode)
+_resolve_root() {
+    if [[ -n "${CAMPSITE_HOME:-}" && -d "$CAMPSITE_HOME/lib" ]]; then
+        printf '%s' "$CAMPSITE_HOME"
+    elif [[ -d "$HOME/.campsite/lib" ]]; then
+        printf '%s' "$HOME/.campsite"
+    else
+        local script_dir
+        script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        printf '%s' "$(cd "$script_dir/.." && pwd)"
+    fi
+}
+
+CAMPSITE_ROOT="$(_resolve_root)"
+CAMPSITE_LIB="$CAMPSITE_ROOT/lib"
+CAMPSITE_TEMPLATES="$CAMPSITE_ROOT/templates"
+
+# --- Source libraries ---
+source "$CAMPSITE_LIB/compat.sh"
+source "$CAMPSITE_LIB/common.sh"
+source "$CAMPSITE_LIB/detect.sh"
+source "$CAMPSITE_LIB/lock.sh"
+source "$CAMPSITE_LIB/hash.sh"
+source "$CAMPSITE_LIB/security.sh"
+source "$CAMPSITE_LIB/compile.sh"
+source "$CAMPSITE_LIB/history.sh"
+source "$CAMPSITE_LIB/ui.sh"
+
+# --- Load defaults ---
+if [[ -f "$CAMPSITE_ROOT/config/defaults.sh" ]]; then
+    source "$CAMPSITE_ROOT/config/defaults.sh"
+fi
+# Load user overrides
+local_global="$(campsite_global_dir)"
+if [[ -f "$local_global/user/config.sh" ]]; then
+    source "$local_global/user/config.sh"
+fi
+
+# ============================================================
+# Commands
+# ============================================================
 
 usage() {
-  printf '%s\n' \
-    "campsite - lightweight session checkpoint harness" \
-    "" \
-    "usage:" \
-    "  campsite init /abs/path/to/project" \
-    "  campsite validate /abs/path/to/project" \
-    "  campsite context /abs/path/to/project" \
-    "  campsite enter /abs/path/to/project [actor]" \
-    "  campsite resume /abs/path/to/project" \
-    "  campsite handoff /abs/path/to/project" \
-    "  campsite leave /abs/path/to/project" \
-    "  campsite summary [/abs/path/to/projects-root]" \
-    "  campsite claude /abs/path/to/project [tool-args...]" \
-    "  campsite codex /abs/path/to/project [tool-args...]" \
-    "  campsite gemini /abs/path/to/project [tool-args...]" \
-    "  campsite openclaw /abs/path/to/project [tool-args...]" \
-    "  campsite help"
+    local version
+    version="$(cat "$CAMPSITE_ROOT/version" 2>/dev/null || cat "$CAMPSITE_ROOT/VERSION" 2>/dev/null || echo "dev")"
+    cat <<EOF
+campsite $version — project state compiler for AI coding agents
+
+usage:
+  campsite                Interactive launcher
+  campsite init [path]    Bootstrap a new campsite project
+  campsite sync           Compile source of truth → agent context files
+  campsite save           Verify updates + cleanup + unlock
+  campsite status         Current project state summary
+  campsite validate       Structure + freshness verification
+  campsite recover        Clear orphaned locks + stale files
+  campsite dashboard      All projects overview
+  campsite workspace set <path>   Set workspace root
+
+  campsite --version      Print version
+  campsite help           Show this message
+EOF
 }
 
-fail() {
-  printf '%s\n' "$1" >&2
-  exit 1
-}
+# --- campsite (no args) — interactive launcher ---
+cmd_launcher() {
+    launcher  # from ui.sh — sets SELECTED_PROJECT, SELECTED_AGENT
 
-require_abs_path() {
-  case $1 in
-    /*) ;;
-    *) fail "path must be absolute: $1" ;;
-  esac
-}
+    local project="$SELECTED_PROJECT"
+    local agent="$SELECTED_AGENT"
+    local device
+    device="$(detect_device)"
 
-slug_from_path() {
-  basename "$1" \
-    | tr '[:upper:]' '[:lower:]' \
-    | sed -e 's/[^a-z0-9]/-/g' -e 's/-\{2,\}/-/g' -e 's/^-//' -e 's/-$//'
-}
+    # Validate
+    _validate_project "$project" quiet
 
-lock_path() {
-  printf '%s/.campsite.lock\n' "$1"
-}
-
-write_lock() {
-  project_root=$1
-  actor=$2
-  tool_name=$3
-  lock_file=$(lock_path "$project_root")
-  hostname_value=$(hostname 2>/dev/null || printf '%s' unknown-host)
-  started_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-
-  if [ -e "$lock_file" ]; then
-    printf '%s\n' "lock exists: $lock_file" >&2
-    sed -n '1,20p' "$lock_file" >&2
-    exit 1
-  fi
-
-  {
-    printf 'actor: %s\n' "$actor"
-    printf 'tool: %s\n' "$tool_name"
-    printf 'pid: %s\n' "$$"
-    printf 'host: %s\n' "$hostname_value"
-    printf 'started-at: %s\n' "$started_at"
-  } > "$lock_file"
-}
-
-remove_lock() {
-  project_root=$1
-  lock_file=$(lock_path "$project_root")
-  rm -f "$lock_file"
-}
-
-field_value() {
-  file_path=$1
-  field_name=$2
-  sed -n "s/^[[:space:]]*-[[:space:]]*${field_name}:[[:space:]]*//p" "$file_path" | head -n 1
-}
-
-require_fresh_file() {
-  file_path=$1
-  label=$2
-
-  if find "$file_path" -mtime +"$STALE_DAYS" | grep -q .; then
-    fail "stale ${label}: $file_path"
-  fi
-}
-
-context_dir() {
-  printf '%s/%s\n' "$1" "$CONTEXT_DIR_NAME"
-}
-
-context_file_path() {
-  printf '%s/session-context.md\n' "$(context_dir "$1")"
-}
-
-build_context_file() {
-  project_root=$1
-  project_name=$(basename "$project_root")
-  lock_file=$(lock_path "$project_root")
-  out_file=$(context_file_path "$project_root")
-  mkdir -p "$(context_dir "$project_root")"
-
-  {
-    printf '# Campsite Session Context - %s\n\n' "$project_name"
-    printf '## Read Order\n\n'
-    printf '1. %s/WORKSPACE.md\n' "$WORKSPACE_ROOT"
-    printf '2. %s/README.md\n' "$project_root"
-    printf '3. %s/status.md\n' "$project_root"
-    printf '4. %s/handoff.md\n\n' "$project_root"
-    printf '## Workspace Rules\n\n'
-    sed -n '1,120p' "$WORKSPACE_ROOT/WORKSPACE.md"
-    printf '\n## Project Summary\n\n'
-    sed -n '1,160p' "$project_root/README.md"
-    printf '\n## Current Status\n\n'
-    sed -n '1,200p' "$project_root/status.md"
-    printf '\n## Current Handoff\n\n'
-    sed -n '1,220p' "$project_root/handoff.md"
-    if [ -f "$lock_file" ]; then
-      printf '\n## Active Lock\n\n'
-      sed -n '1,40p' "$lock_file"
+    # Hash integrity check
+    if ! hash_compare "$project" 2>/dev/null; then
+        local rc=$?
+        if [[ $rc -eq 1 ]]; then
+            warn "source files changed since last campsite sync"
+            ui_confirm "Accept changes and continue?" || exit 1
+        fi
     fi
-  } > "$out_file"
 
-  printf '%s\n' "$out_file"
+    # Lock
+    lock_acquire "$project" "${USER:-unknown}" "$agent"
+
+    # Compile
+    local compiled_file
+    compiled_file="$(compile_context "$project" "$agent")"
+    info "context compiled → $(basename "$compiled_file")"
+
+    # Store entry hash
+    local entry_hash
+    entry_hash="$(hash_compute "$project")"
+
+    # Banner
+    ui_banner "$project" "$agent" "$device"
+    info "launching $agent..."
+    printf '\n'
+
+    # Trap for cleanup on exit
+    local start_time
+    start_time="$(date +%s)"
+
+    _session_cleanup() {
+        local end_time
+        end_time="$(date +%s)"
+        local duration=$(( end_time - start_time ))
+        local outcome="normal"
+
+        # Check if source files were updated
+        local current_hash
+        current_hash="$(hash_compute "$project" 2>/dev/null || echo "")"
+        if [[ "$current_hash" == "$entry_hash" ]]; then
+            printf '\n'
+            warn "status.md/handoff.md unchanged during session"
+            warn "consider updating before your next session"
+        fi
+
+        # Cleanup compiled file
+        compile_cleanup "$project" "$agent" 2>/dev/null || true
+
+        # Release lock
+        lock_release "$project" 2>/dev/null || true
+
+        # Record history
+        history_append "$project" "$agent" "$device" "$(now_iso)" "$duration" "$outcome" 2>/dev/null || true
+    }
+    trap _session_cleanup EXIT
+
+    # Get agent command from adapter
+    adapter_load "$agent"
+    local agent_cmd="$ADAPTER_COMMAND"
+
+    # Launch agent as child process (not exec — so trap works)
+    cd "$project"
+    "$agent_cmd" || true
 }
 
-render_if_missing() {
-  src=$1
-  dst=$2
-  slug=$3
-  title=$4
-  today=$5
+# --- campsite init [path] ---
+cmd_init() {
+    local project_root="${1:-$PWD}"
+    project_root="$(resolve_path "$project_root")"
 
-  if [ ! -e "$dst" ]; then
-    sed \
-      -e "s/project-name/$slug/g" \
-      -e "s/Project Name/$title/g" \
-      -e "s/yyyy-mm-dd/$today/g" \
-      "$src" > "$dst"
-  fi
+    local slug
+    slug="$(slug_from_path "$project_root")"
+    local title
+    title="$(basename "$project_root")"
+    local today
+    today="$(today_date)"
+
+    mkdir -p "$project_root"/{scripts,docs,src,tests,deploy}
+    mkdir -p "$project_root/.campsite"
+
+    # Render templates
+    _render_if_missing() {
+        local src="$1" dst="$2"
+        if [[ ! -e "$dst" ]]; then
+            sed \
+                -e "s/project-name/$slug/g" \
+                -e "s/Project Name/$title/g" \
+                -e "s/yyyy-mm-dd/$today/g" \
+                "$src" > "$dst"
+        fi
+    }
+
+    _render_if_missing "$CAMPSITE_TEMPLATES/README.md.template"               "$project_root/README.md"
+    _render_if_missing "$CAMPSITE_TEMPLATES/status.md.template"               "$project_root/status.md"
+    _render_if_missing "$CAMPSITE_TEMPLATES/handoff.md.template"              "$project_root/handoff.md"
+    _render_if_missing "$CAMPSITE_TEMPLATES/decisions.md.template"            "$project_root/decisions.md"
+    _render_if_missing "$CAMPSITE_TEMPLATES/gitignore.template"               "$project_root/.gitignore"
+    _render_if_missing "$CAMPSITE_TEMPLATES/project-bootstrap.sh.template"    "$project_root/scripts/bootstrap.sh"
+
+    [[ -f "$project_root/scripts/bootstrap.sh" ]] && chmod +x "$project_root/scripts/bootstrap.sh"
+
+    info "project initialized: $project_root"
 }
 
-command_init() {
-  [ "$#" -eq 1 ] || fail "usage: campsite init /abs/path/to/project"
-  project_root=$1
-  require_abs_path "$project_root"
+# --- campsite sync [--adapter=name] ---
+cmd_sync() {
+    local specific_adapter=""
 
-  slug=$(slug_from_path "$project_root")
-  title=$(basename "$project_root")
-  today=$(date -u '+%Y-%m-%d')
+    # Parse args
+    for arg in "$@"; do
+        case "$arg" in
+            --adapter=*) specific_adapter="${arg#--adapter=}" ;;
+            *) ;;
+        esac
+    done
 
-  mkdir -p "$project_root/scripts" "$project_root/docs" "$project_root/src" "$project_root/tests" "$project_root/deploy"
+    local project
+    project="$(detect_project)"
 
-  render_if_missing "$TEMPLATE_ROOT/README.md.template" "$project_root/README.md" "$slug" "$title" "$today"
-  render_if_missing "$TEMPLATE_ROOT/status.md.template" "$project_root/status.md" "$slug" "$title" "$today"
-  render_if_missing "$TEMPLATE_ROOT/handoff.md.template" "$project_root/handoff.md" "$slug" "$title" "$today"
-  render_if_missing "$TEMPLATE_ROOT/decisions.md.template" "$project_root/decisions.md" "$slug" "$title" "$today"
-  render_if_missing "$TEMPLATE_ROOT/gitignore.template" "$project_root/.gitignore" "$slug" "$title" "$today"
-  render_if_missing "$TEMPLATE_ROOT/project-bootstrap.sh.template" "$project_root/scripts/bootstrap.sh" "$slug" "$title" "$today"
+    _validate_project "$project" quiet
 
-  chmod +x "$project_root/scripts/bootstrap.sh"
-  printf '%s\n' "bootstrapped: $project_root"
+    # Hash integrity check
+    local hash_rc=0
+    hash_compare "$project" 2>/dev/null || hash_rc=$?
+    if [[ $hash_rc -eq 1 ]]; then
+        warn "source files changed since last campsite save"
+        ui_confirm "Accept changes?" || exit 1
+    fi
+
+    if [[ -n "$specific_adapter" ]]; then
+        local compiled
+        compiled="$(compile_context "$project" "$specific_adapter")"
+        info "compiled → $(basename "$compiled")"
+    else
+        # Compile for all adapters whose command is in PATH
+        local count=0
+        while IFS= read -r adapter_name; do
+            local adapter_file
+            adapter_file="$(_adapter_find "$adapter_name" 2>/dev/null)" || continue
+            local cmd
+            cmd="$(field_value_plain "$adapter_file" "command")"
+            if command -v "$cmd" >/dev/null 2>&1; then
+                local compiled
+                compiled="$(compile_context "$project" "$adapter_name")"
+                info "compiled → $(basename "$compiled")"
+                ((count++))
+            fi
+        done < <(adapter_list 2>/dev/null)
+
+        if [[ $count -eq 0 ]]; then
+            warn "no agent commands found in PATH. Compiled 0 files."
+            warn "install an AI coding agent (claude, codex, gemini, etc.) or use --adapter=<name>"
+        fi
+    fi
+
+    # Store hash
+    hash_store "$project"
+    info "hash stored"
 }
 
-command_validate() {
-  [ "$#" -eq 1 ] || fail "usage: campsite validate /abs/path/to/project"
-  project_root=$1
-  require_abs_path "$project_root"
+# --- campsite save ---
+cmd_save() {
+    local project
+    project="$(detect_project)"
 
-  required_paths='README.md status.md handoff.md decisions.md scripts/bootstrap.sh src tests deploy'
+    # Credential scan
+    if ! scan_project_files "$project" 2>/dev/null; then
+        warn "potential credentials detected in source files"
+        ui_confirm "Continue anyway?" || exit 1
+    fi
 
-  for path in $required_paths; do
-    [ -e "$project_root/$path" ] || fail "missing: $project_root/$path"
-  done
+    # Hash comparison
+    local hash_rc=0
+    hash_compare "$project" 2>/dev/null || hash_rc=$?
+    if [[ $hash_rc -eq 0 ]]; then
+        warn "source files unchanged since last sync — did you update status.md/handoff.md?"
+    fi
 
-  grep -q "^# Status" "$project_root/status.md" || fail "invalid status.md header"
-  grep -q "^# Handoff" "$project_root/handoff.md" || fail "invalid handoff.md header"
+    # Cleanup compiled files
+    compile_cleanup_all "$project"
+    info "compiled files cleaned"
 
-  phase=$(field_value "$project_root/status.md" phase)
-  [ -n "$phase" ] || fail "missing status phase"
-  case $phase in
-    discovery|building|testing|reviewing|blocked|deployed) ;;
-    *) fail "invalid phase: $phase" ;;
-  esac
+    # Release lock
+    if lock_is_held "$project" 2>/dev/null; then
+        lock_release "$project" 2>/dev/null || true
+        info "lock released"
+    fi
 
-  task=$(field_value "$project_root/handoff.md" task)
-  [ -n "$task" ] || fail "empty handoff task"
-
-  fallback_task=$(field_value "$project_root/handoff.md" fallback-task || true)
-  : "${fallback_task:=}"
-
-  [ -x "$project_root/scripts/bootstrap.sh" ] || fail "scripts/bootstrap.sh is not executable"
-  require_fresh_file "$project_root/status.md" "status.md"
-  require_fresh_file "$project_root/handoff.md" "handoff.md"
-
-  printf '%s\n' "valid: $project_root"
+    # Store current hash
+    hash_store "$project"
+    info "save complete: $(basename "$project")"
 }
 
-command_open() {
-  [ "$#" -eq 1 ] || fail "usage: campsite resume /abs/path/to/project"
-  project_root=$1
-  require_abs_path "$project_root"
+# --- campsite status ---
+cmd_status() {
+    local project
+    project="$(detect_project)"
 
-  printf '%s\n' "project: $project_root"
-  printf '%s\n' "read in order:"
-  printf '%s\n' "1. $WORKSPACE_ROOT/WORKSPACE.md"
-  printf '%s\n' "2. $project_root/README.md"
-  printf '%s\n' "3. $project_root/status.md"
-  printf '%s\n' "4. $project_root/handoff.md"
-  if [ -f "$project_root/.campsite.lock" ]; then
-    printf '%s\n' "lock:"
-    sed -n '1,20p' "$project_root/.campsite.lock"
-  fi
+    local name
+    name="$(basename "$project")"
+    local phase
+    phase="$(field_value "$project/status.md" "phase" 2>/dev/null || echo "?")"
+    local confidence
+    confidence="$(field_value "$project/status.md" "confidence" 2>/dev/null || echo "?")"
+    local last_updated
+    last_updated="$(field_value "$project/status.md" "last-updated" 2>/dev/null || echo "?")"
+    local last_agent
+    last_agent="$(field_value "$project/status.md" "last-agent" 2>/dev/null || echo "?")"
+    local last_device
+    last_device="$(field_value "$project/status.md" "last-device" 2>/dev/null || echo "?")"
+
+    printf '\n'
+    printf "  ${_C_BOLD:-}%s${_C_RESET:-}\n" "$name"
+    printf "  phase:        %s\n" "$phase"
+    printf "  confidence:   %s\n" "$confidence"
+    printf "  last-updated: %s\n" "$last_updated"
+    printf "  last-agent:   %s\n" "$last_agent"
+    printf "  last-device:  %s\n" "$last_device"
+
+    # Lock
+    if lock_is_held "$project" 2>/dev/null; then
+        local lock_file
+        lock_file="$(lock_path "$project")"
+        local held_by
+        held_by="$(field_value_plain "$lock_file" "actor" 2>/dev/null || echo "?")"
+        local held_tool
+        held_tool="$(field_value_plain "$lock_file" "tool" 2>/dev/null || echo "?")"
+        printf "  lock:         ${_C_RED:-}locked${_C_RESET:-} by %s (%s)\n" "$held_by" "$held_tool"
+    else
+        printf "  lock:         ${_C_GREEN:-}unlocked${_C_RESET:-}\n"
+    fi
+
+    # Hash
+    local hash_rc=0
+    hash_compare "$project" 2>/dev/null || hash_rc=$?
+    case $hash_rc in
+        0) printf "  integrity:    ${_C_GREEN:-}clean${_C_RESET:-}\n" ;;
+        1) printf "  integrity:    ${_C_YELLOW:-}changed${_C_RESET:-} (source files modified since last sync)\n" ;;
+        2) printf "  integrity:    ${_C_DIM:-}no baseline${_C_RESET:-} (run campsite sync)\n" ;;
+    esac
+
+    # Next task
+    local task
+    task="$(field_value "$project/handoff.md" "task" 2>/dev/null || echo "?")"
+    printf "  next:         %s\n" "$task"
+    printf '\n'
 }
 
-command_context() {
-  [ "$#" -eq 1 ] || fail "usage: campsite context /abs/path/to/project"
-  project_root=$1
-  require_abs_path "$project_root"
-  command_validate "$project_root" >/dev/null
-  build_context_file "$project_root"
+# --- campsite validate ---
+cmd_validate() {
+    local project
+    project="$(detect_project)"
+    _validate_project "$project" verbose
+    info "valid: $(basename "$project")"
 }
 
-command_summary() {
-  [ "$#" -le 1 ] || fail "usage: campsite summary [/abs/path/to/projects-root]"
-  root=${1:-$WORKSPACE_ROOT/projects}
-  require_abs_path "$root"
+_validate_project() {
+    local project="$1"
+    local mode="${2:-verbose}"
 
-  for status_file in "$root"/*/status.md; do
-    [ -f "$status_file" ] || continue
-    project_dir=$(dirname "$status_file")
-    project_name=$(basename "$project_dir")
-    phase=$(field_value "$status_file" phase)
-    confidence=$(field_value "$status_file" confidence)
-    printf '%s | %s | %s\n' "$project_name" "$phase" "$confidence"
-  done
+    # Required files
+    for file in README.md status.md handoff.md decisions.md; do
+        [[ -f "$project/$file" ]] || fail "missing: $project/$file"
+    done
+
+    # Header checks
+    grep -q "^# Status" "$project/status.md" || fail "invalid status.md header"
+    grep -q "^# Handoff" "$project/handoff.md" || fail "invalid handoff.md header"
+
+    # Phase validation
+    local phase
+    phase="$(field_value "$project/status.md" "phase")"
+    [[ -n "$phase" ]] || fail "missing status phase"
+    case "$phase" in
+        discovery|building|testing|reviewing|blocked|deployed) ;;
+        *) fail "invalid phase: $phase" ;;
+    esac
+
+    # Task validation
+    local task
+    task="$(field_value "$project/handoff.md" "task")"
+    [[ -n "$task" ]] || fail "empty handoff task"
+
+    # Freshness check
+    if [[ "$mode" == "verbose" ]]; then
+        local stale_seconds=$(( ${CAMPSITE_STALE_DAYS:-2} * 86400 ))
+        local mtime now_epoch age
+        mtime="$(portable_stat_mtime "$project/status.md" 2>/dev/null || echo 0)"
+        now_epoch="$(date +%s)"
+        age=$(( now_epoch - mtime ))
+        if [[ $age -gt $stale_seconds ]]; then
+            local days=$(( age / 86400 ))
+            warn "status.md is ${days} days old"
+        fi
+    fi
 }
 
-command_start() {
-  [ "$#" -ge 1 ] && [ "$#" -le 2 ] || fail "usage: campsite enter /abs/path/to/project [actor]"
-  project_root=$1
-  require_abs_path "$project_root"
-  actor=${2:-${USER:-unknown}}
+# --- campsite recover ---
+cmd_recover() {
+    local workspace=""
+    workspace="$(detect_workspace 2>/dev/null)" || true
 
-  command_validate "$project_root" >/dev/null
-  write_lock "$project_root" "$actor" manual
+    if [[ -z "$workspace" ]]; then
+        # Try current project only
+        local project
+        project="$(detect_project 2>/dev/null)" || fail "no project or workspace found"
+        _recover_project "$project"
+        return
+    fi
 
-  printf '%s\n' "entered: $project_root"
-  command_open "$project_root"
+    local found=0
+    while IFS= read -r project; do
+        _recover_project "$project" && ((found++))
+    done < <(detect_all_projects "$workspace" 2>/dev/null || true)
+
+    if [[ $found -eq 0 ]]; then
+        info "no recovery needed"
+    fi
 }
 
-command_finish() {
-  [ "$#" -eq 1 ] || fail "usage: campsite leave /abs/path/to/project"
-  project_root=$1
-  require_abs_path "$project_root"
-  lock_file=$(lock_path "$project_root")
+_recover_project() {
+    local project="$1"
+    local name
+    name="$(basename "$project")"
+    local recovered=0
 
-  [ -e "$lock_file" ] || fail "no lock file: $lock_file"
-  remove_lock "$project_root"
-  printf '%s\n' "left: $project_root"
-  printf '%s\n' "remember to update status.md and handoff.md before commit"
+    # Check for orphaned lock
+    if [[ -f "$(lock_path "$project")" ]]; then
+        if lock_check_orphan "$project"; then
+            rm -f "$(lock_path "$project")"
+            info "$name: orphaned lock cleared"
+            ((recovered++))
+        fi
+    fi
+
+    # Check for stale compiled files without active lock
+    if ! lock_is_held "$project" 2>/dev/null; then
+        local cleaned=0
+        while IFS= read -r adapter_name; do
+            if compile_cleanup "$project" "$adapter_name" 2>/dev/null; then
+                ((cleaned++))
+            fi
+        done < <(adapter_list 2>/dev/null || true)
+        if [[ $cleaned -gt 0 ]]; then
+            info "$name: $cleaned stale compiled files cleaned"
+            ((recovered++))
+        fi
+    fi
+
+    return $(( recovered > 0 ? 0 : 1 ))
 }
 
-command_handoff() {
-  [ "$#" -eq 1 ] || fail "usage: campsite handoff /abs/path/to/project"
-  project_root=$1
-  require_abs_path "$project_root"
+# --- campsite dashboard ---
+cmd_dashboard() {
+    local workspace=""
+    workspace="$(detect_workspace 2>/dev/null)" || true
 
-  command_validate "$project_root" >/dev/null
+    if [[ -z "$workspace" ]]; then
+        fail "no workspace found. Set CAMPSITE_WORKSPACE or create WORKSPACE.md in a parent directory."
+    fi
 
-  printf '%s\n' "handoff: $project_root"
-  printf '%s\n' "current status:"
-  sed -n '1,120p' "$project_root/status.md"
-  printf '\n%s\n' "next action:"
-  sed -n '1,160p' "$project_root/handoff.md"
-  printf '\n%s\n' "compiled context:"
-  build_context_file "$project_root"
+    printf '\n'
+    printf "  ${_C_BOLD:-}campsite dashboard${_C_RESET:-}\n"
+    printf "  %s\n\n" "$workspace"
+
+    printf "  %-20s │ %-10s │ %-10s │ %-12s │ %s\n" "PROJECT" "PHASE" "CONFIDENCE" "LOCK" "NEXT"
+    printf "  %-20s─┼─%-10s─┼─%-10s─┼─%-12s─┼─%s\n" "────────────────────" "──────────" "──────────" "────────────" "────────────────"
+
+    while IFS= read -r project; do
+        local name
+        name="$(basename "$project")"
+        local phase
+        phase="$(field_value "$project/status.md" "phase" 2>/dev/null || echo "?")"
+        local confidence
+        confidence="$(field_value "$project/status.md" "confidence" 2>/dev/null || echo "?")"
+        local task
+        task="$(field_value "$project/handoff.md" "task" 2>/dev/null || echo "?")"
+        # Truncate task to 40 chars
+        [[ ${#task} -gt 40 ]] && task="${task:0:37}..."
+
+        local lock_status
+        if lock_is_held "$project" 2>/dev/null; then
+            local held_tool
+            held_tool="$(field_value_plain "$(project_campsite_dir "$project")/lock" "tool" 2>/dev/null || echo "?")"
+            lock_status="${_C_RED:-}locked${_C_RESET:-}($held_tool)"
+        elif [[ -f "$(lock_path "$project")" ]]; then
+            lock_status="${_C_YELLOW:-}orphaned${_C_RESET:-}"
+        else
+            lock_status="${_C_GREEN:-}free${_C_RESET:-}"
+        fi
+
+        printf "  %-20s │ %-10s │ %-10s │ %-12b │ %s\n" \
+            "$name" "$phase" "$confidence" "$lock_status" "$task"
+    done < <(detect_all_projects "$workspace" 2>/dev/null)
+
+    printf '\n'
 }
 
-command_agent() {
-  tool_name=$1
-  shift
+# --- campsite workspace set <path> ---
+cmd_workspace_set() {
+    [[ $# -ge 1 ]] || fail "usage: campsite workspace set <path>"
+    local ws_path
+    ws_path="$(resolve_path "$1")"
+    [[ -d "$ws_path" ]] || fail "directory not found: $ws_path"
 
-  [ "$#" -ge 1 ] || fail "usage: campsite $tool_name /abs/path/to/project [tool-args...]"
-  project_root=$1
-  shift
-  require_abs_path "$project_root"
+    local global_dir
+    global_dir="$(campsite_global_dir)"
+    mkdir -p "$global_dir/user"
 
-  if ! command -v "$tool_name" >/dev/null 2>&1; then
-    fail "command not found in PATH: $tool_name"
-  fi
+    local config_file="$global_dir/user/config.sh"
 
-  actor=${USER:-unknown}
+    if [[ -f "$config_file" ]] && grep -q 'CAMPSITE_WORKSPACE=' "$config_file"; then
+        # Update existing
+        sed -i.bak "s|^.*CAMPSITE_WORKSPACE=.*|CAMPSITE_WORKSPACE=\"$ws_path\"|" "$config_file"
+        rm -f "${config_file}.bak"
+    else
+        printf '\nCAMPSITE_WORKSPACE="%s"\n' "$ws_path" >> "$config_file"
+    fi
 
-  command_validate "$project_root" >/dev/null
-  write_lock "$project_root" "$actor" "$tool_name"
-  context_file=$(build_context_file "$project_root")
-
-  cleanup() {
-    remove_lock "$project_root"
-  }
-
-  trap cleanup EXIT INT TERM HUP
-
-  printf '%s\n' "tool: $tool_name"
-  command_open "$project_root"
-  printf '%s\n' "context-file: $context_file"
-  printf '%s\n' "launching: $tool_name"
-
-  (
-    cd "$project_root"
-    CAMPSITE_PROJECT_ROOT=$project_root \
-    CAMPSITE_WORKSPACE_ROOT=$WORKSPACE_ROOT \
-    CAMPSITE_CONTEXT_FILE=$context_file \
-    CAMPSITE_TOOL=$tool_name \
-    exec "$tool_name" "$@"
-  )
+    info "workspace set to: $ws_path"
 }
+
+# --- Deprecated command messages ---
+_deprecated() {
+    local old="$1" new="$2"
+    warn "'campsite $old' is deprecated. Use: $new"
+    exit 1
+}
+
+# ============================================================
+# Main
+# ============================================================
 
 main() {
-  [ "$#" -ge 1 ] || {
-    usage
-    exit 1
-  }
-
-  cmd=$1
-  shift
-
-  case $cmd in
-    init) command_init "$@" ;;
-    validate) command_validate "$@" ;;
-    context) command_context "$@" ;;
-    open|resume) command_open "$@" ;;
-    summary) command_summary "$@" ;;
-    start|enter) command_start "$@" ;;
-    finish|leave) command_finish "$@" ;;
-    handoff) command_handoff "$@" ;;
-    claude) command_agent claude "$@" ;;
-    codex) command_agent codex "$@" ;;
-    gemini) command_agent gemini "$@" ;;
-    openclaw) command_agent openclaw "$@" ;;
-    help|-h|--help) usage ;;
-    *) fail "unknown command: $cmd" ;;
-  esac
+    case "${1:-}" in
+        "")
+            cmd_launcher
+            ;;
+        init)
+            shift; cmd_init "$@"
+            ;;
+        sync)
+            shift; cmd_sync "$@"
+            ;;
+        save)
+            shift; cmd_save "$@"
+            ;;
+        status)
+            shift; cmd_status "$@"
+            ;;
+        validate)
+            shift; cmd_validate "$@"
+            ;;
+        recover)
+            shift; cmd_recover "$@"
+            ;;
+        dashboard)
+            shift; cmd_dashboard "$@"
+            ;;
+        workspace)
+            shift
+            case "${1:-}" in
+                set) shift; cmd_workspace_set "$@" ;;
+                *) fail "usage: campsite workspace set <path>" ;;
+            esac
+            ;;
+        --version|-v)
+            cat "$CAMPSITE_ROOT/version" 2>/dev/null \
+                || cat "$CAMPSITE_ROOT/VERSION" 2>/dev/null \
+                || echo "dev"
+            ;;
+        help|-h|--help)
+            usage
+            ;;
+        # Deprecated commands
+        enter|start)   _deprecated "$1" "campsite (launcher)" ;;
+        leave|finish)  _deprecated "$1" "campsite save" ;;
+        resume|open)   _deprecated "$1" "campsite status" ;;
+        handoff)       _deprecated "$1" "campsite status" ;;
+        context)       _deprecated "$1" "campsite sync" ;;
+        summary)       _deprecated "$1" "campsite dashboard" ;;
+        claude|codex|gemini|openclaw)
+            _deprecated "$1" "campsite (launcher, then select $1)"
+            ;;
+        *)
+            fail "unknown command: $1. Run 'campsite help' for usage."
+            ;;
+    esac
 }
 
 main "$@"

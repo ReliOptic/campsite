@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# Campsite common utilities
+[[ -n "${_CAMPSITE_COMMON_LOADED:-}" ]] && return 0
+_CAMPSITE_COMMON_LOADED=1
+
+fail() {
+    printf '\033[31merror:\033[0m %s\n' "$1" >&2
+    exit 1
+}
+
+warn() {
+    printf '\033[33mwarning:\033[0m %s\n' "$1" >&2
+}
+
+info() {
+    printf '\033[32m✓\033[0m %s\n' "$1"
+}
+
+# Extract field value from markdown list (- key: value)
+field_value() {
+    local file="$1" field="$2"
+    sed -n "s/^[[:space:]]*-[[:space:]]*${field}:[[:space:]]*//p" "$file" | head -n 1
+}
+
+# Extract field value from plain key-value file (key: value)
+field_value_plain() {
+    local file="$1" field="$2"
+    sed -n "s/^${field}:[[:space:]]*//p" "$file" | head -n 1
+}
+
+slug_from_path() {
+    basename "$1" \
+        | tr '[:upper:]' '[:lower:]' \
+        | sed -e 's/[^a-z0-9]/-/g' -e 's/-\{2,\}/-/g' -e 's/^-//' -e 's/-$//'
+}
+
+require_file() {
+    local path="$1" label="${2:-$1}"
+    [[ -f "$path" ]] || fail "missing: $label ($path)"
+}
+
+# Returns the global campsite directory, creating if needed
+campsite_global_dir() {
+    local dir="${CAMPSITE_HOME:-$HOME/.campsite}"
+    mkdir -p "$dir"
+    printf '%s' "$dir"
+}
+
+# Returns the project-local .campsite directory, creating if needed
+project_campsite_dir() {
+    local project_root="$1"
+    local dir="$project_root/.campsite"
+    mkdir -p "$dir"
+    printf '%s' "$dir"
+}
+
+# Resolve a path to absolute
+resolve_path() {
+    local path="$1"
+    if [[ "$path" = /* ]]; then
+        printf '%s' "$path"
+    else
+        printf '%s' "$(cd "$path" 2>/dev/null && pwd)"
+    fi
+}
+
+# Current timestamp in ISO-8601 UTC
+now_iso() {
+    date -u '+%Y-%m-%dT%H:%M:%SZ'
+}
+
+# Current date YYYY-MM-DD
+today_date() {
+    date -u '+%Y-%m-%d'
+}
