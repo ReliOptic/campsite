@@ -13,26 +13,26 @@ teardown() {
 }
 
 @test "recover clears orphaned lock with dead PID" {
-    # Create a lock with a non-existent PID on the current host
-    mkdir -p "$TEST_PROJECT/.campsite"
-    cat > "$TEST_PROJECT/.campsite/lock" << EOF
-actor: olduser
-tool: claude
-pid: 99999999
-host: $(hostname)
-started-at: 2026-03-01T00:00:00Z
-EOF
-    
-    [[ -f "$TEST_PROJECT/.campsite/lock" ]]
-    
+    # Acquire a real lock (sets host via detect_device), then replace PID with dead one
+    lock_acquire "$TEST_PROJECT" "olduser" "claude"
+    local lock_file
+    lock_file="$(lock_path "$TEST_PROJECT")"
+
+    local tmp="$lock_file.new"
+    grep -v "^pid:" "$lock_file" > "$tmp"
+    printf 'pid: 99999999\n' >> "$tmp"
+    mv "$tmp" "$lock_file"
+
+    [[ -f "$lock_file" ]]
+
     # Check if orphan
     run lock_check_orphan "$TEST_PROJECT"
     [[ "$status" -eq 0 ]]
-    
+
     # Clear orphan
-    rm -f "$TEST_PROJECT/.campsite/lock"
-    
-    [[ ! -f "$TEST_PROJECT/.campsite/lock" ]]
+    rm -f "$lock_file"
+
+    [[ ! -f "$lock_file" ]]
 }
 
 @test "recover preserves active lock with live PID" {
