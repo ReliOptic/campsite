@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Run shellcheck
+        run: make lint
+
+  test:
+    name: Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install bats-core (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats
+
+      - name: Install bats-core (macOS)
+        if: runner.os == 'macOS'
+        run: brew install bats-core
+
+      - name: Run smoke test
+        run: make test-smoke
+
+      - name: Run unit tests
+        run: make test-unit
+
+      - name: Run integration tests
+        run: make test-integration
+
+  install:
+    name: Install Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test install script
+        run: |
+          bash install.sh
+          export CAMPSITE_HOME="$HOME/.campsite"
+          export PATH="$CAMPSITE_HOME/bin:$PATH"
+          campsite --version
+
+      - name: Test make install
+        run: |
+          make install
+          export CAMPSITE_HOME="$HOME/.campsite"
+          export PATH="$CAMPSITE_HOME/bin:$PATH"
+          campsite --version
+
+      - name: Test make dev
+        run: |
+          make uninstall || true
+          make dev
+          export CAMPSITE_HOME="$HOME/.campsite"
+          export PATH="$CAMPSITE_HOME/bin:$PATH"
+          campsite --version
+
+  release:
+    name: Release Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [lint, test, install]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check VERSION file
+        run: |
+          VERSION=$(cat VERSION)
+          echo "Current version: $VERSION"
+          
+          # Check if tag exists
+          if git tag -l "v$VERSION" | grep -q "v$VERSION"; then
+            echo "Tag v$VERSION already exists"
+          else
+            echo "New version detected: $VERSION"
+            echo "Consider creating tag: git tag v$VERSION && git push --tags"
+          fi

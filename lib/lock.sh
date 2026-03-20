@@ -65,6 +65,7 @@ lock_release() {
 }
 
 # Returns 0 if lock exists but the owning process is dead (orphaned)
+# Handles cross-device scenarios where PID validation is meaningless
 lock_check_orphan() {
     local project_root="$1"
     local lock_file
@@ -72,12 +73,31 @@ lock_check_orphan() {
 
     [[ -f "$lock_file" ]] || return 1  # no lock = not orphaned
 
-    local lock_pid
+    local lock_pid lock_host current_host
     lock_pid="$(field_value_plain "$lock_file" "pid")"
+    lock_host="$(field_value_plain "$lock_file" "host")"
+    current_host="$(detect_device)"
 
     [[ -n "$lock_pid" ]] || return 0  # no PID recorded = treat as orphan
 
-    # Check if PID is alive
+    # Cross-device check: if lock is from different host, PID validation is meaningless
+    if [[ -n "$lock_host" && "$lock_host" != "$current_host" ]]; then
+        # Different machine — use age-based fallback only
+        local lock_age_limit="${CAMPSITE_LOCK_EXPIRY:-86400}"
+        local lock_mtime now_epoch
+        lock_mtime="$(portable_stat_mtime "$lock_file" 2>/dev/null || echo 0)"
+        now_epoch="$(date +%s)"
+        local age=$(( now_epoch - lock_mtime ))
+
+        if [[ $age -gt $lock_age_limit ]]; then
+            return 0  # old enough to be orphan
+        fi
+
+        # Lock is fresh but from different host — cannot determine, assume held
+        return 1
+    fi
+
+    # Same host — check if PID is alive
     if kill -0 "$lock_pid" 2>/dev/null; then
         # PID is alive — but could be a different process (PID reuse)
         # Fall back to age check

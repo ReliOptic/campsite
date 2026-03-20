@@ -3,8 +3,15 @@
 [[ -n "${_CAMPSITE_SECURITY_LOADED:-}" ]] && return 0
 _CAMPSITE_SECURITY_LOADED=1
 
-# Pattern for common credential indicators
-_CREDENTIAL_PATTERN='(api[_-]?key|secret|password|passwd|token|credential|private[_-]?key|AWS_SECRET|AWS_ACCESS|GITHUB_TOKEN|OPENAI_API_KEY|ANTHROPIC_API_KEY)'
+# Pattern for credential keywords that should have an assignment
+_CREDENTIAL_KEYWORDS='(api[_-]?key|secret[_-]?key|password|passwd|private[_-]?key|AWS_SECRET|AWS_ACCESS|GITHUB_TOKEN|OPENAI_API_KEY|ANTHROPIC_API_KEY)'
+
+# Pattern requiring assignment operator followed by a value (reduces false positives)
+# Matches: key=value, key: value, key="value", key='value'
+_CREDENTIAL_ASSIGNMENT_PATTERN="${_CREDENTIAL_KEYWORDS}[[:space:]]*[=:][[:space:]]*['\"]?[A-Za-z0-9+/=_-]{8,}"
+
+# False positive patterns to exclude
+_FALSE_POSITIVE_PATTERNS='(token limit|secret feature|password policy|api key rotation|token bucket|access token endpoint|password reset|secret sauce)'
 
 # Scan a single file for credential patterns
 # Returns 0 if clean, 1 if found
@@ -12,9 +19,18 @@ scan_credentials() {
     local file="$1"
     [[ -f "$file" ]] || return 0
 
-    if grep -inE "$_CREDENTIAL_PATTERN" "$file" 2>/dev/null | grep -vE '^\s*(#|//|<!--)' | head -5 > /dev/null 2>&1; then
+    # Skip if CAMPSITE_SKIP_SECURITY is set
+    [[ -n "${CAMPSITE_SKIP_SECURITY:-}" ]] && return 0
+
+    local findings
+    findings="$(grep -inE "$_CREDENTIAL_ASSIGNMENT_PATTERN" "$file" 2>/dev/null \
+        | grep -vE '^\s*(#|//|<!--|%|;)' \
+        | grep -viE "$_FALSE_POSITIVE_PATTERNS" \
+        | head -5)"
+
+    if [[ -n "$findings" ]]; then
         warn "potential credentials in $file:"
-        grep -inE "$_CREDENTIAL_PATTERN" "$file" 2>/dev/null | grep -vE '^\s*(#|//|<!--)' | head -5 >&2
+        printf '%s\n' "$findings" >&2
         return 1
     fi
 

@@ -10,8 +10,10 @@ hash_compute() {
     local campsite_dir
     campsite_dir="$(project_campsite_dir "$project_root")"
 
+    local source_files="${CAMPSITE_SOURCE_FILES:-status.md handoff.md}"
     local combined=""
-    for file in "$project_root/status.md" "$project_root/handoff.md"; do
+    for filename in $source_files; do
+        local file="$project_root/$filename"
         if [[ -f "$file" ]]; then
             local h
             h="$(portable_sha256 "$file")"
@@ -105,11 +107,11 @@ sync_state_show() {
         elapsed=$(( now_epoch - sync_epoch ))
 
         if [[ $elapsed -lt 3600 ]]; then
-            printf '  마지막 sync: %d분 전 (%s)\n' "$(( elapsed / 60 ))" "$synced_at"
+            printf '  last sync: %d minutes ago (%s)\n' "$(( elapsed / 60 ))" "$synced_at"
         elif [[ $elapsed -lt 86400 ]]; then
-            printf '  마지막 sync: %d시간 전 (%s)\n' "$(( elapsed / 3600 ))" "$synced_at"
+            printf '  last sync: %d hours ago (%s)\n' "$(( elapsed / 3600 ))" "$synced_at"
         else
-            printf '  마지막 sync: %d일 전 (%s)\n' "$(( elapsed / 86400 ))" "$synced_at"
+            printf '  last sync: %d days ago (%s)\n' "$(( elapsed / 86400 ))" "$synced_at"
         fi
     fi
 
@@ -119,16 +121,16 @@ sync_state_show() {
         current_head="$(git -C "$project_root" rev-parse HEAD 2>/dev/null)"
 
         if [[ "$git_head" == "$current_head" ]]; then
-            printf '  git 변경사항: 없음 (코드 변경 없음)\n'
+            printf '  git changes: none (no code changes)\n'
         else
-            printf '  세션 중 변경된 파일:\n'
+            printf '  files changed during session:\n'
             git -C "$project_root" diff --stat "${git_head}..HEAD" 2>/dev/null \
                 | head -20 \
                 | sed 's/^/    /'
             local commit_count
             commit_count="$(git -C "$project_root" rev-list --count "${git_head}..HEAD" 2>/dev/null || echo 0)"
             if [[ "$commit_count" -gt 0 ]]; then
-                printf '  새 커밋: %s개\n' "$commit_count"
+                printf '  new commits: %s\n' "$commit_count"
             fi
         fi
     else
@@ -141,9 +143,9 @@ sync_state_show() {
         handoff_mtime="$(portable_stat_mtime "$project_root/handoff.md" 2>/dev/null || echo 0)"
 
         if [[ $status_mtime -gt $sync_epoch ]] || [[ $handoff_mtime -gt $sync_epoch ]]; then
-            printf '  변경 감지: status.md 또는 handoff.md가 sync 이후 수정됨\n'
+            printf '  changes detected: status.md or handoff.md modified since sync\n'
         else
-            printf '  변경 감지: source 파일 변경 없음\n'
+            printf '  changes detected: no source file changes\n'
         fi
     fi
 }

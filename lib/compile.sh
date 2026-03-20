@@ -94,6 +94,42 @@ adapter_load() {
     [[ -n "$ADAPTER_COMMAND" ]] || fail "adapter $name missing command"
 }
 
+# Extract the last N decisions from decisions.md
+# Decisions are separated by ## headers (level 2)
+_extract_recent_decisions() {
+    local file="$1"
+    local count="${CAMPSITE_DECISION_COUNT:-5}"
+    
+    [[ -f "$file" ]] || return 0
+    
+    # Use awk to extract last N decision blocks
+    # Each block starts with "## " and ends before the next "## " or EOF
+    awk -v n="$count" '
+        /^## / {
+            # Store the line number where each decision starts
+            starts[++num_decisions] = NR
+        }
+        {
+            # Store all lines
+            lines[NR] = $0
+        }
+        END {
+            if (num_decisions == 0) {
+                # No decisions found, print everything
+                for (i = 1; i <= NR; i++) print lines[i]
+            } else {
+                # Calculate which decision to start from
+                start_from = num_decisions - n + 1
+                if (start_from < 1) start_from = 1
+                
+                # Print from the start of the chosen decision to the end
+                start_line = starts[start_from]
+                for (i = start_line; i <= NR; i++) print lines[i]
+            }
+        }
+    ' "$file"
+}
+
 # Compile context for a specific adapter
 # Returns the path to the compiled file
 compile_context() {
@@ -162,8 +198,7 @@ compile_context() {
                 decisions)
                     if [[ -f "$project_root/decisions.md" ]]; then
                         printf '## Recent Decisions\n\n'
-                        # Last 5 decisions (find last 5 ## headers)
-                        tail -100 "$project_root/decisions.md"
+                        _extract_recent_decisions "$project_root/decisions.md"
                         printf '\n\n'
                     fi
                     ;;

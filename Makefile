@@ -2,7 +2,9 @@ PREFIX ?= $(HOME)/.campsite
 VERSION := $(shell cat VERSION 2>/dev/null || git describe --tags --always 2>/dev/null || echo dev)
 CURDIR := $(shell pwd)
 
-.PHONY: help install uninstall dev test
+SHELL_FILES := bin/campsite $(wildcard lib/*.sh) $(wildcard adapters/*.sh)
+
+.PHONY: help install uninstall dev test test-unit test-integration lint check
 
 help:
 	@printf '%s\n' \
@@ -14,7 +16,11 @@ help:
 		"  make dev         Symlink for development (edits go live immediately)" \
 		"" \
 		"Development:" \
-		"  make test        Run basic smoke tests"
+		"  make test        Run all tests (unit + integration)" \
+		"  make test-unit   Run unit tests only" \
+		"  make test-integration  Run integration tests only" \
+		"  make lint        Run shellcheck on all shell files" \
+		"  make check       Run lint + test"
 
 install:
 	@mkdir -p "$(PREFIX)/bin" "$(PREFIX)/lib" "$(PREFIX)/adapters" \
@@ -73,7 +79,38 @@ dev:
 	@printf '%s\n' "$(VERSION)" > "$(PREFIX)/VERSION"
 	@printf '\033[32m%s\033[0m\n' "campsite dev mode: $(PREFIX) -> $(CURDIR)"
 
-test:
+test: test-unit test-integration
+	@printf '\033[32m%s\033[0m\n' "All tests passed"
+
+test-unit:
+	@if [ -d tests/unit ] && ls tests/unit/*.bats >/dev/null 2>&1; then \
+		printf '%s\n' "Running unit tests..."; \
+		bats tests/unit/; \
+	else \
+		printf '%s\n' "No unit tests found (tests/unit/*.bats)"; \
+	fi
+
+test-integration:
+	@if [ -d tests/integration ] && ls tests/integration/*.bats >/dev/null 2>&1; then \
+		printf '%s\n' "Running integration tests..."; \
+		bats tests/integration/; \
+	else \
+		printf '%s\n' "No integration tests found (tests/integration/*.bats)"; \
+	fi
+
+test-smoke:
 	@printf '%s\n' "Running smoke tests..."
 	@bash bin/campsite --version
-	@printf '\033[32m%s\033[0m\n' "All tests passed"
+	@printf '\033[32m%s\033[0m\n' "Smoke tests passed"
+
+lint:
+	@printf '%s\n' "Running shellcheck..."
+	@if command -v shellcheck >/dev/null 2>&1; then \
+		shellcheck -x $(SHELL_FILES); \
+		printf '\033[32m%s\033[0m\n' "Lint passed"; \
+	else \
+		printf '\033[33m%s\033[0m\n' "shellcheck not installed. Install with: apt install shellcheck"; \
+		exit 1; \
+	fi
+
+check: lint test

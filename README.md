@@ -227,6 +227,18 @@ rm -rf ~/.campsite
 
 ---
 
+## 문서 (Documentation)
+
+| 문서 | 역할 |
+|------|------|
+| [docs/landing.md](docs/landing.md) | 제품 소개 · ICP · 반례 (Anti-patterns) · 크로스 디바이스 가치 |
+| [docs/guide.md](docs/guide.md) | 사용 튜토리얼 (설치 → 일상 워크플로) |
+| [docs/reference.md](docs/reference.md) | CLI / 설정 / 어댑터 스펙 레퍼런스 |
+| [docs/CIP.md](docs/CIP.md) | Continuous Improvement Projects (로드맵) |
+| [docs/improvement-plan.md](docs/improvement-plan.md) | 기술 개선 계획 |
+
+---
+
 ## GitHub
 
 **https://github.com/ReliOptic/campsite**

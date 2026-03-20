@@ -20,5 +20,6 @@ AGENTS.md
 GEMINI.md
 .github/copilot-instructions.md
 
-# Campsite project-local data
+# Campsite project-local data (includes lock, hash, sync-state)
+# These are machine-specific and should not be committed
 .campsite/

@@ -1,0 +1,20 @@
+# Campsite shell wrapper for Fish
+# Add this to your ~/.config/fish/config.fish
+#
+# The wrapper enables `campsite go` to change directories in the current shell.
+# Without this wrapper, `campsite go` will print the path but not cd into it.
+
+function campsite --description "Campsite CLI with cd support for 'go' command"
+    if test (count $argv) -gt 0; and test "$argv[1]" = "go"
+        set -l target (command campsite $argv)
+        set -l exit_code $status
+        
+        if test $exit_code -eq 0; and test -n "$target"; and test -d "$target"
+            cd "$target"
+            printf "  \033[32m✓\033[0m jumped to: %s\n" "$target"
+            return 0
+        end
+        return $exit_code
+    end
+    command campsite $argv
+end

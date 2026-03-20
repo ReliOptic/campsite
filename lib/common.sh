@@ -58,12 +58,46 @@ project_campsite_dir() {
 }
 
 # Resolve a path to absolute
+# For existing paths: returns canonical absolute path
+# For new paths: returns absolute path (parent must exist)
 resolve_path() {
     local path="$1"
+    
+    if [[ -z "$path" ]]; then
+        fail "resolve_path: empty path provided"
+    fi
+    
     if [[ "$path" = /* ]]; then
-        printf '%s' "$path"
+        # Absolute path
+        if [[ -e "$path" ]]; then
+            # Path exists — return as-is
+            printf '%s' "$path"
+        elif [[ -d "$(dirname "$path")" ]]; then
+            # Parent exists — valid for new file/dir creation
+            printf '%s' "$path"
+        else
+            fail "path does not exist: $path"
+        fi
     else
-        printf '%s' "$(cd "$path" 2>/dev/null && pwd)"
+        # Relative path
+        if [[ -d "$path" ]]; then
+            # Directory exists — cd and pwd
+            cd "$path" && pwd
+        elif [[ -f "$path" ]]; then
+            # File exists — resolve via dirname
+            local dir file
+            dir="$(cd "$(dirname "$path")" && pwd)"
+            file="$(basename "$path")"
+            printf '%s/%s' "$dir" "$file"
+        elif [[ -d "$(dirname "$path")" ]]; then
+            # Parent exists — valid for new file/dir
+            local dir file
+            dir="$(cd "$(dirname "$path")" && pwd)"
+            file="$(basename "$path")"
+            printf '%s/%s' "$dir" "$file"
+        else
+            fail "cannot resolve path: $path"
+        fi
     fi
 }
 

@@ -165,11 +165,18 @@ cmd_init() {
     _render_if_missing() {
         local src="$1" dst="$2"
         if [[ ! -e "$dst" ]]; then
+            if [[ ! -f "$src" ]]; then
+                warn "template not found: $src (skipping)"
+                return 1
+            fi
             sed \
                 -e "s/project-name/$slug/g" \
                 -e "s/Project Name/$title/g" \
                 -e "s/yyyy-mm-dd/$today/g" \
-                "$src" > "$dst"
+                "$src" > "$dst" || {
+                    warn "failed to render template: $src"
+                    return 1
+                }
         fi
     }
 
@@ -356,11 +363,11 @@ _validate_project() {
     local phase
     phase="$(field_value "$project/status.md" "phase")"
     [[ -n "$phase" ]] || fail "missing status phase"
-    case "$phase" in
-        discovery|building|testing|reviewing|blocked|deployed) ;;
-        *) fail "invalid phase: $phase" \
-            "Valid: discovery, building, testing, reviewing, blocked, deployed" ;;
-    esac
+    
+    local valid_phases="${CAMPSITE_VALID_PHASES:-discovery building testing reviewing blocked deployed}"
+    if [[ ! " $valid_phases " =~ [[:space:]]${phase}[[:space:]] ]]; then
+        fail "invalid phase: $phase" "Valid: $valid_phases"
+    fi
 
     # Task validation
     local task
@@ -400,7 +407,7 @@ cmd_recover() {
     done < <(detect_all_projects "$workspace" 2>/dev/null || true)
 
     if [[ $found -eq 0 ]]; then
-        info "모든 프로젝트 정상 — 복구 필요 없음"
+        info "all projects healthy — no recovery needed"
     fi
 }
 
@@ -419,11 +426,11 @@ _recover_project() {
             tool_at_crash="$(field_value_plain "$lock_file" "tool" 2>/dev/null || echo "?")"
 
             printf '\n'
-            printf "  ${_C_YELLOW:-}⚠${_C_RESET:-}  ${_C_BOLD:-}%s${_C_RESET:-} — 비정상 종료 감지\n" "$name"
-            printf "  에이전트: %s\n" "$tool_at_crash"
+            printf "  ${_C_YELLOW:-}⚠${_C_RESET:-}  ${_C_BOLD:-}%s${_C_RESET:-} — abnormal termination detected\n" "$name"
+            printf "  agent: %s\n" "$tool_at_crash"
 
             rm -f "$(lock_path "$project")"
-            printf "  ${_C_GREEN:-}✓${_C_RESET:-} orphaned lock 정리됨\n"
+            printf "  ${_C_GREEN:-}✓${_C_RESET:-} orphaned lock cleared\n"
             had_crash=1
             recovered=$((recovered + 1))
         fi
@@ -438,7 +445,7 @@ _recover_project() {
             fi
         done < <(adapter_list 2>/dev/null || true)
         if [[ $cleaned -gt 0 ]]; then
-            printf "  ${_C_GREEN:-}✓${_C_RESET:-} %d개 컴파일 파일 정리됨\n" "$cleaned"
+            printf "  ${_C_GREEN:-}✓${_C_RESET:-} %d compiled file(s) cleaned\n" "$cleaned"
             recovered=$((recovered + 1))
         fi
     fi
@@ -448,13 +455,13 @@ _recover_project() {
         printf '\n'
         sync_state_show "$project" 2>/dev/null || true
         printf '\n'
-        printf "  ${_C_BOLD:-}권장 조치:${_C_RESET:-}\n"
-        printf "    1. 위 변경사항 확인 (git diff, git log)\n"
-        printf "    2. status.md, handoff.md 업데이트\n"
+        printf "  ${_C_BOLD:-}recommended actions:${_C_RESET:-}\n"
+        printf "    1. review changes above (git diff, git log)\n"
+        printf "    2. update status.md, handoff.md\n"
         printf "    3. campsite save\n"
         printf '\n'
     elif [[ $recovered -eq 0 ]]; then
-        info "$name: 복구 필요 없음"
+        info "$name: no recovery needed"
     fi
 
     return $(( recovered > 0 ? 0 : 1 ))

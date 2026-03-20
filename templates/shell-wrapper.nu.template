@@ -1,0 +1,17 @@
+# Campsite shell wrapper for Nushell
+# Add this to your ~/.config/nushell/config.nu
+#
+# The wrapper enables `campsite go` to change directories in the current shell.
+# Without this wrapper, `campsite go` will print the path but not cd into it.
+
+def campsite [...args] {
+    if ($args | length) > 0 and ($args | first) == "go" {
+        let target = (^campsite ...$args | str trim)
+        if ($target | is-not-empty) and ($target | path exists) {
+            cd $target
+            print $"  (ansi green)✓(ansi reset) jumped to: ($target)"
+        }
+    } else {
+        ^campsite ...$args
+    }
+}
