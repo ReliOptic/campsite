@@ -223,7 +223,7 @@ cmd_sync() {
                 local compiled
                 compiled="$(compile_context "$project" "$adapter_name")"
                 info "compiled → $(basename "$compiled")"
-                ((count++))
+                count=$((count + 1))
             fi
         done < <(adapter_list 2>/dev/null)
 
@@ -233,8 +233,9 @@ cmd_sync() {
         fi
     fi
 
-    # Store hash
+    # Store hash + sync state (git HEAD snapshot for crash recovery)
     hash_store "$project"
+    sync_state_save "$project" 2>/dev/null || true
     info "hash stored"
 }
 
@@ -390,11 +391,11 @@ cmd_recover() {
 
     local found=0
     while IFS= read -r project; do
-        _recover_project "$project" && ((found++))
+        _recover_project "$project" && found=$((found + 1))
     done < <(detect_all_projects "$workspace" 2>/dev/null || true)
 
     if [[ $found -eq 0 ]]; then
-        info "no recovery needed"
+        info "모든 프로젝트 정상 — 복구 필요 없음"
     fi
 }
 
@@ -403,13 +404,23 @@ _recover_project() {
     local name
     name="$(basename "$project")"
     local recovered=0
+    local had_crash=0
 
-    # Check for orphaned lock
+    # Check for orphaned lock (= crash indicator)
     if [[ -f "$(lock_path "$project")" ]]; then
         if lock_check_orphan "$project"; then
+            local lock_file tool_at_crash
+            lock_file="$(lock_path "$project")"
+            tool_at_crash="$(field_value_plain "$lock_file" "tool" 2>/dev/null || echo "?")"
+
+            printf '\n'
+            printf "  ${_C_YELLOW:-}⚠${_C_RESET:-}  ${_C_BOLD:-}%s${_C_RESET:-} — 비정상 종료 감지\n" "$name"
+            printf "  에이전트: %s\n" "$tool_at_crash"
+
             rm -f "$(lock_path "$project")"
-            info "$name: orphaned lock cleared"
-            ((recovered++))
+            printf "  ${_C_GREEN:-}✓${_C_RESET:-} orphaned lock 정리됨\n"
+            had_crash=1
+            recovered=$((recovered + 1))
         fi
     fi
 
@@ -418,13 +429,27 @@ _recover_project() {
         local cleaned=0
         while IFS= read -r adapter_name; do
             if compile_cleanup "$project" "$adapter_name" 2>/dev/null; then
-                ((cleaned++))
+                cleaned=$((cleaned + 1))
             fi
         done < <(adapter_list 2>/dev/null || true)
         if [[ $cleaned -gt 0 ]]; then
-            info "$name: $cleaned stale compiled files cleaned"
-            ((recovered++))
+            printf "  ${_C_GREEN:-}✓${_C_RESET:-} %d개 컴파일 파일 정리됨\n" "$cleaned"
+            recovered=$((recovered + 1))
         fi
+    fi
+
+    # Show crash recovery info: what changed during the dead session
+    if [[ $had_crash -eq 1 ]]; then
+        printf '\n'
+        sync_state_show "$project" 2>/dev/null || true
+        printf '\n'
+        printf "  ${_C_BOLD:-}권장 조치:${_C_RESET:-}\n"
+        printf "    1. 위 변경사항 확인 (git diff, git log)\n"
+        printf "    2. status.md, handoff.md 업데이트\n"
+        printf "    3. campsite save\n"
+        printf '\n'
+    elif [[ $recovered -eq 0 ]]; then
+        info "$name: 복구 필요 없음"
     fi
 
     return $(( recovered > 0 ? 0 : 1 ))
