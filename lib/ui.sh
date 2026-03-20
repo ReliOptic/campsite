@@ -223,7 +223,8 @@ ui_path_prompt() {
     # Resolve to absolute path
     if [[ "$input" != /* ]]; then
         input="$(cd "$input" 2>/dev/null && pwd)" || {
-            fail "cannot access: $input"
+            fail "cannot access: $input" \
+                 "Use an absolute path, or try 'campsite setup --here' to start from the current folder."
         }
     fi
 

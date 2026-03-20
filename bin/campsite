@@ -514,78 +514,206 @@ cmd_dashboard() {
     printf '\n'
 }
 
-# --- campsite setup — first-run guided onboarding ---
-cmd_setup() {
-    printf '\n'
-    printf "  ${_C_BOLD:-}campsite setup${_C_RESET:-} — initial configuration\n\n"
+# --- campsite setup helpers ---
 
-    # Step 1: Workspace
-    printf "  ${_C_BOLD:-}Step 1: Workspace${_C_RESET:-}\n"
-    printf "  Where are your projects stored?\n"
+# Returns 0 if path looks like a project directory
+_setup_is_project_dir() {
+    local path="$1"
+    [[ -f "$path/status.md" ]]    && return 0
+    [[ -f "$path/handoff.md" ]]   && return 0
+    [[ -d "$path/.git" ]]         && return 0
+    [[ -f "$path/package.json" ]] && return 0
+    [[ -f "$path/pyproject.toml" ]] && return 0
+    [[ -f "$path/Cargo.toml" ]]   && return 0
+    [[ -f "$path/go.mod" ]]       && return 0
+    [[ -f "$path/README.md" ]]    && return 0
+    return 1
+}
 
-    local ws_default="${CAMPSITE_WORKSPACE:-$HOME/projects}"
-    local ws_path
-    ws_path="$(ui_path_prompt "path" "$ws_default")" || exit 1
-    printf '\n'
-
-    cmd_workspace_set "$ws_path"
-    printf '\n'
-
-    # Step 2: Detect existing projects
-    printf "  ${_C_BOLD:-}Step 2: Projects${_C_RESET:-}\n"
-    local project_count=0
-    while IFS= read -r dir; do
-        local pname
-        pname="$(basename "$dir")"
-        local has_status="" has_handoff=""
-        [[ -f "$dir/status.md" ]] && has_status="${_C_GREEN:-}✓${_C_RESET:-}" || has_status="${_C_RED:-}✗${_C_RESET:-}"
-        [[ -f "$dir/handoff.md" ]] && has_handoff="${_C_GREEN:-}✓${_C_RESET:-}" || has_handoff="${_C_RED:-}✗${_C_RESET:-}"
-        printf "    %b  %-20s  (status.md %b  handoff.md %b)\n" \
-            "${_C_DIM:-}$((project_count + 1))${_C_RESET:-}" "$pname" "$has_status" "$has_handoff"
-        project_count=$((project_count + 1))
-    done < <(detect_all_projects "$ws_path" 2>/dev/null || true)
-
-    if [[ $project_count -eq 0 ]]; then
-        printf "  No campsite projects found.\n"
-    else
-        printf "  Found %d project(s).\n" "$project_count"
-    fi
-
-    printf '\n'
-    if ui_confirm "Initialize a new project?"; then
-        local new_path
-        new_path="$(ui_path_prompt "project path" "$ws_path/my-project")" || true
-        if [[ -n "$new_path" ]]; then
-            cmd_init "$new_path"
-        fi
-    fi
-    printf '\n'
-
-    # Step 3: Check available agents
-    printf "  ${_C_BOLD:-}Step 3: Agents${_C_RESET:-}\n"
-    printf "  Checking installed agents...\n"
-    while IFS= read -r adapter_name; do
-        local adapter_file
-        adapter_file="$(_adapter_find "$adapter_name" 2>/dev/null)" || continue
-        local cmd
-        cmd="$(field_value_plain "$adapter_file" "command")"
-        if command -v "$cmd" >/dev/null 2>&1; then
-            local cmd_path
-            cmd_path="$(command -v "$cmd")"
-            printf "    ${_C_GREEN:-}✓${_C_RESET:-} %-10s (%s)\n" "$adapter_name" "$cmd_path"
+# Infer path intent: "project" | "workspace" | "new-valid" | "new-invalid"
+_setup_infer_type() {
+    local path="$1"
+    if [[ -d "$path" ]]; then
+        if _setup_is_project_dir "$path"; then
+            printf 'project'
         else
-            printf "    ${_C_RED:-}✗${_C_RESET:-} %-10s (not found)\n" "$adapter_name"
+            printf 'workspace'
+        fi
+    elif [[ -d "$(dirname "$path")" ]]; then
+        printf 'new-valid'
+    else
+        printf 'new-invalid'
+    fi
+}
+
+# Normalize any path input to absolute (handles ~, ., .., relative)
+_setup_normalize_path() {
+    local input="$1"
+    input="${input/#\~/$HOME}"
+    if [[ "$input" = "." ]]; then
+        pwd; return 0
+    fi
+    if [[ "$input" != /* ]]; then
+        local resolved
+        resolved="$(cd "$input" 2>/dev/null && pwd)" \
+            || resolved="$(pwd)/$input"
+        printf '%s' "$resolved"
+    else
+        printf '%s' "$input"
+    fi
+}
+
+# --- campsite setup — intent-absorbing bootstrap ---
+cmd_setup() {
+    local here=0
+    [[ "${1:-}" == "--here" ]] && here=1
+
+    printf '\n'
+    printf "  ${_C_BOLD:-}campsite setup${_C_RESET:-}\n\n"
+
+    # --- Get path input ---
+    local raw_path
+    if [[ $here -eq 1 ]]; then
+        raw_path="$(pwd)"
+        printf "  Using current folder:\n"
+        printf "    ${_C_BOLD:-}%s${_C_RESET:-}\n\n" "$raw_path"
+    else
+        local default_path="${CAMPSITE_WORKSPACE:-$HOME/projects}"
+        printf "  Enter a project or workspace path:\n"
+        printf "  ${_C_DIM:-}(project folder, workspace root, or a new path)${_C_RESET:-}\n\n"
+        printf "  path ${_C_DIM:-}[%s]${_C_RESET:-}: " "$default_path"
+        read -r raw_path
+        [[ -z "$raw_path" ]] && raw_path="$default_path"
+    fi
+
+    # --- Normalize ---
+    local abs_path
+    abs_path="$(_setup_normalize_path "$raw_path")"
+    printf '\n'
+
+    # --- Infer intent ---
+    local path_type
+    path_type="$(_setup_infer_type "$abs_path")"
+
+    local ws_path="" proj_path="" do_init=0
+
+    case "$path_type" in
+
+        project)
+            ws_path="$(dirname "$abs_path")"
+            proj_path="$abs_path"
+            printf "  That looks like a project folder:\n"
+            printf "    ${_C_BOLD:-}%s${_C_RESET:-}\n\n" "$proj_path"
+            printf "  Suggested workspace (parent):\n"
+            printf "    ${_C_BOLD:-}%s${_C_RESET:-}\n\n" "$ws_path"
+            printf "  Project   : %s\n" "$proj_path"
+            printf "  Workspace : %s\n" "$ws_path"
+            printf '\n'
+            if ! ui_confirm "Use this setup?"; then
+                printf '\n'
+                printf "  Enter workspace path manually: "
+                read -r ws_path
+                ws_path="$(_setup_normalize_path "$ws_path")"
+                mkdir -p "$ws_path"
+            fi
+            ;;
+
+        workspace)
+            ws_path="$abs_path"
+            printf "  Workspace detected:\n"
+            printf "    ${_C_BOLD:-}%s${_C_RESET:-}\n\n" "$ws_path"
+            if ui_confirm "Initialize a new project inside this workspace?"; then
+                do_init=1
+                printf "  Project name: "
+                read -r proj_name
+                [[ -z "$proj_name" ]] && proj_name="my-project"
+                proj_path="$ws_path/$proj_name"
+            fi
+            ;;
+
+        new-valid)
+            ws_path="$(dirname "$abs_path")"
+            proj_path="$abs_path"
+            printf "  That folder does not exist yet:\n"
+            printf "    ${_C_BOLD:-}%s${_C_RESET:-}\n\n" "$abs_path"
+            printf "  Suggested workspace:\n"
+            printf "    ${_C_BOLD:-}%s${_C_RESET:-}\n\n" "$ws_path"
+            printf '\n'
+            if ui_confirm "Create it as a new project?"; then
+                do_init=1
+                mkdir -p "$abs_path"
+            else
+                printf '\n  Aborting setup.\n\n'
+                return 0
+            fi
+            ;;
+
+        new-invalid)
+            printf "  I could not use that path — its parent does not exist:\n"
+            printf "    ${_C_DIM:-}%s${_C_RESET:-}\n\n" "$(dirname "$abs_path")"
+            printf "  Try one of these instead:\n"
+            printf "    1) Use current folder: %s\n" "$(pwd)"
+            printf "    2) Use home projects:  %s\n" "$HOME/projects"
+            printf "    3) Enter another path\n"
+            printf '\n  Choice [1]: '
+            read -r choice
+            case "${choice:-1}" in
+                2) abs_path="$HOME/projects"; mkdir -p "$abs_path" ;;
+                3) printf '  Path: '; read -r abs_path
+                   abs_path="$(_setup_normalize_path "$abs_path")" ;;
+                *) abs_path="$(pwd)" ;;
+            esac
+            printf '\n'
+            # Recurse with resolved path
+            CAMPSITE_WORKSPACE="$abs_path" cmd_setup
+            return $?
+            ;;
+    esac
+
+    # --- Apply workspace ---
+    [[ -z "$ws_path" ]] && ws_path="$abs_path"
+    mkdir -p "$ws_path"
+    printf '\n'
+    cmd_workspace_set "$ws_path"
+
+    # --- Init project if requested ---
+    if [[ $do_init -eq 1 && -n "$proj_path" ]]; then
+        printf '\n'
+        cmd_init "$proj_path"
+    fi
+
+    printf '\n'
+
+    # --- Check agents ---
+    local found_agents=0
+    while IFS= read -r adapter_name; do
+        local adapter_file cmd_bin
+        adapter_file="$(_adapter_find "$adapter_name" 2>/dev/null)" || continue
+        cmd_bin="$(field_value_plain "$adapter_file" "command")"
+        if command -v "$cmd_bin" >/dev/null 2>&1; then
+            printf "  ${_C_GREEN:-}✓${_C_RESET:-} %s\n" "$adapter_name"
+            found_agents=$((found_agents + 1))
         fi
     done < <(adapter_list 2>/dev/null || true)
+    [[ $found_agents -eq 0 ]] && \
+        printf "  ${_C_DIM:-}No AI agents detected. Install claude, codex, or gemini to use campsite.${_C_RESET:-}\n"
 
-    printf '\n'
-
-    # Mark setup complete
+    # --- Mark complete ---
     local global_dir
     global_dir="$(campsite_global_dir)"
     printf '%s\n' "$(now_iso)" > "$global_dir/setup-complete"
 
-    info "setup complete. Run 'campsite' to start a session."
+    # --- Success output ---
+    printf '\n'
+    printf "  ${_C_GREEN:-}✓${_C_RESET:-} Setup complete.\n\n"
+    printf "  You can now resume this project from the same state across sessions.\n\n"
+    [[ -n "$proj_path" ]] && printf "  Project   : %s\n" "$proj_path"
+    printf "  Workspace : %s\n" "$ws_path"
+    printf '\n'
+    printf "  Next steps:\n"
+    printf "    campsite sync\n"
+    printf "    campsite peek\n"
+    printf "    campsite save\n"
     printf '\n'
 }
 

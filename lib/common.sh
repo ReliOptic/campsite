@@ -76,7 +76,8 @@ resolve_path() {
             # Parent exists — valid for new file/dir creation
             printf '%s' "$path"
         else
-            fail "path does not exist: $path"
+            fail "path not accessible: $path" \
+             "Check the parent directory exists, or use 'campsite setup --here' to start from the current folder."
         fi
     else
         # Relative path
@@ -96,7 +97,8 @@ resolve_path() {
             file="$(basename "$path")"
             printf '%s/%s' "$dir" "$file"
         else
-            fail "cannot resolve path: $path"
+            fail "path not found: $path" \
+                 "Use an absolute path, or run from within the target directory."
         fi
     fi
 }
