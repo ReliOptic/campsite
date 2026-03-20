@@ -39,7 +39,7 @@ _adapter_find() {
 adapter_list() {
     local global_dir
     global_dir="$(campsite_global_dir)"
-    local -A seen
+    local seen=""
 
     # Built-in adapters (installed)
     if [[ -d "$global_dir/adapters" ]]; then
@@ -47,7 +47,8 @@ adapter_list() {
             [[ -f "$f" ]] || continue
             local name
             name="$(basename "$f" .sh)"
-            seen[$name]=1
+            case "$seen" in *"|${name}|"*) continue ;; esac
+            seen="${seen}|${name}|"
             printf '%s\n' "$name"
         done
     fi
@@ -58,8 +59,8 @@ adapter_list() {
             [[ -f "$f" ]] || continue
             local name
             name="$(basename "$f" .sh)"
-            [[ -n "${seen[$name]:-}" ]] && continue
-            seen[$name]=1
+            case "$seen" in *"|${name}|"*) continue ;; esac
+            seen="${seen}|${name}|"
             printf '%s\n' "$name"
         done
     fi
@@ -70,8 +71,8 @@ adapter_list() {
             [[ -f "$f" ]] || continue
             local name
             name="$(basename "$f" .sh)"
-            [[ -n "${seen[$name]:-}" ]] && continue
-            seen[$name]=1
+            case "$seen" in *"|${name}|"*) continue ;; esac
+            seen="${seen}|${name}|"
             printf '%s\n' "$name"
         done
     fi
