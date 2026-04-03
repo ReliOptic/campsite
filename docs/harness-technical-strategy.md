@@ -22,6 +22,9 @@ Its design center is:
 - recover cheaply
 - keep overhead low
 
+This remains true even if Campsite later adopts a stronger terminal foundation such as `libghostty`.
+That kind of dependency belongs below the product layer. It should strengthen Focus mode execution without redefining Campsite's recovery-first product meaning.
+
 ## Harness Layers
 
 ### 1. Static contract
@@ -129,6 +132,12 @@ To stay viable on old laptops and 4GB-class VMs, Campsite must remain non-reside
 - direct delegation to the agent CLI is acceptable
 - output proxying and terminal rendering are out of scope
 
+If a future embedded terminal foundation is introduced, it must obey the same discipline:
+
+- strengthen execution
+- avoid becoming a heavy resident orchestrator
+- preserve Campsite's state layer and product semantics above it
+
 ## Failure Taxonomy
 
 Primary failure classes for Campsite:
@@ -154,3 +163,7 @@ The product should be judged on operational metrics, not aesthetic structure.
 ## Product Discipline
 
 Following the fieldkit logic from the book, Campsite should add tools only when their recovery value exceeds their operating cost. If a new script increases process friction but does not lower escalation or recovery time, it should not ship.
+
+Related boundary document:
+
+- `docs/libghostty-foundation-boundary.md`

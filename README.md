@@ -1,249 +1,301 @@
 # Campsite
 
-> AI 코딩 에이전트를 위한 프로젝트 상태 컴파일러 + 크래시 리커버리 하네스
+> Recovery-first AI workspace for ideation, review, and stamina.
 
-bare `claude`를 치면 빈 방에 들어가는 것이다.
-`campsite sync` 후 `claude`를 치면 **어제 내가 떠난 책상에 다시 앉는** 것이다.
+You work in a terminal.
+
+You step into Campsite when you need room to recover context, see what your agents are doing, and decide the next move.
+
+You step back into execution without losing the thread.
+
+That is the product.
 
 ---
 
-## 설치
+## Campsite Makes Three Promises
 
-### curl (권장)
+### 1. 발상 (Ideation)
+
+Campsite gives you a place to direct AI and AI agents with clear goals and clear context.
+
+This matters because most AI workflows fail before execution. The mission is vague. The handoff is muddy. The agent starts moving, but the builder has not actually framed the work.
+
+Campsite exists to make intent sharper:
+
+- what are we trying to do
+- who is doing what
+- what is the current mission
+- what should happen next
+
+It is a place to form the mission before the chaos starts.
+
+### 2. 검토 (Review)
+
+Campsite gives you a place to control AI output and turn raw output into good finished work.
+
+AI can generate quickly. That is not the hard part anymore.
+
+The hard part is:
+
+- noticing what changed
+- deciding what is good
+- spotting what is blocked
+- reviewing what is ready
+
+Campsite makes review visible. It is built around human judgment, not blind automation.
+
+### 3. 체력 (Stamina)
+
+Campsite gives you the ability to do more ideation and more review without collapsing into confusion.
+
+This is the quiet superpower.
+
+Real work is not one uninterrupted sprint. You leave. You come back. You switch devices. You switch tools. You live your life. Then you return and try to remember what was happening.
+
+Campsite lowers that restart cost.
+
+It helps you build long-breath creative stamina:
+
+- recover context faster
+- hold multiple threads without panic
+- let AI keep moving without losing trust
+- keep going over days, not just one burst
+
+---
+
+## What Campsite Is
+
+Campsite is a recovery-first AI workspace.
+
+It is not just a compiler.
+It is not just a terminal.
+It is not just a web UI.
+
+It is one workspace with two connected surfaces:
+
+- `Focus mode`
+  Terminal-first execution, speed, deep work
+- `Camp mode`
+  Spatial recovery, state awareness, vibe, re-entry
+
+The terminal is where you push.
+The camp is where you recover, review, and redirect.
+
+They must feel like the same world.
+
+---
+
+## Why It Exists
+
+AI coding tools are powerful and amnesic.
+
+They help you generate output fast, but they do not naturally preserve your sense of:
+
+- what you were building
+- which agent is still active
+- what finished
+- what needs you now
+
+That is why Campsite exists.
+
+The problem is not only memory.
+The problem is recovery.
+
+---
+
+## The Experience
+
+You are building in the terminal.
+
+Claude is working on one thing.
+Codex is finishing another.
+You step away for a meeting, go outside, switch projects, travel, spend time with family, or just sleep.
+
+Then you come back.
+
+Campsite should let you understand your world in seconds:
+
+- who is still working
+- what is waiting on you
+- what the next move is
+
+That is the core user experience.
+
+---
+
+## The Vibe
+
+Campsite is not meant to feel like a corporate dashboard.
+
+The design direction is:
+
+- nocturnal
+- calm
+- warm hearth in a wide space
+- terminal-native
+- pixel camp, but operational
+
+Sometimes that means aurora over a northern camp.
+Sometimes it means granite, forest, canyon daylight, or a place that matches where you are and how you want to work.
+
+The scenery may change.
+The feeling should not:
+
+- calm
+- focused
+- alive
+- never frantic
+
+This is not aggressive automation.
+This is tranquil autonomy.
+
+---
+
+## What Makes It Different
+
+Most agent products push toward one of two poles:
+
+- endless automation loops
+- flat dashboards full of logs
+
+Campsite is aiming somewhere else.
+
+It is trying to become the place where:
+
+- AI keeps moving
+- the human stays oriented
+- review stays central
+- the workflow stays compatible with real life
+
+That is a different product.
+
+---
+
+## Current Shape
+
+Today, Campsite already includes:
+
+- project bootstrap
+- `status.md` and `handoff.md` as source-of-truth
+- agent context compilation for native context files
+- lock and recovery flow
+- session-aware local camp state
+- recovery-first camp prototype
+
+The product is evolving from a pure project-state compiler into a fuller AI workspace.
+
+---
+
+## Quick Start
+
+### Install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ReliOptic/campsite/main/install.sh | bash
 ```
 
-새 터미널을 열거나 즉시 적용:
+Open a new shell or export immediately:
 
 ```bash
 export CAMPSITE_HOME="$HOME/.campsite"
 export PATH="$CAMPSITE_HOME/bin:$PATH"
 ```
 
-확인:
+### Start a Project
 
 ```bash
-campsite --version
-```
-
-### git clone
-
-```bash
-git clone https://github.com/ReliOptic/campsite.git
-cd campsite
-bash install.sh
-```
-
-### 개발자 모드 (소스 직접 수정)
-
-```bash
-git clone https://github.com/ReliOptic/campsite.git
-cd campsite
-make dev   # ~/.campsite/bin/campsite → 소스 트리 symlink
-```
-
----
-
-## 지원 플랫폼
-
-| 플랫폼 | 지원 |
-|---|---|
-| macOS | ✅ |
-| Linux | ✅ |
-| Windows (WSL) | ✅ |
-
-요구사항: `bash`, `git`, 표준 Unix 도구. 추가 의존성 없음.
-
----
-
-## 핵심 개념
-
-Campsite는 **wrapper가 아니라 compiler**다.
-
-```
-이전 (wrapper):   campsite claude /path → 에이전트 실행 경로에 끼어듦
-
-현재 (compiler):  campsite sync
-                       ↓ 생성
-                  CLAUDE.md, AGENTS.md, .cursorrules, GEMINI.md ...
-                       ↓ 각 도구가 네이티브로 읽음
-                  claude    (직접)
-                  cursor    (직접)
-                  codex     (직접)
-```
-
-`campsite sync`가 끝나면 campsite는 메모리에 없다. 에이전트는 자기 네이티브 파일만 읽는다.
-
----
-
-## 빠른 시작
-
-```bash
-# 1. 새 프로젝트 부트스트랩
 campsite init ~/projects/my-app
 cd ~/projects/my-app
+```
 
-# 2. status.md, handoff.md 편집 (현재 상태 + 다음 작업 기록)
+Update your project state:
 
-# 3. 에이전트 네이티브 컨텍스트 파일 컴파일
+- `status.md`
+- `handoff.md`
+- `decisions.md`
+
+Then compile and work:
+
+```bash
 campsite sync
-
-# 4. 에이전트 시작 (claude가 CLAUDE.md를 자동으로 읽음)
 claude
+```
 
-# 5. 세션 종료 시
+Or open the current recovery-first camp view:
+
+```bash
+campsite camp render
+```
+
+When you are done:
+
+```bash
 campsite save
 ```
 
 ---
 
-## CLI 명령어
+## Commands
 
-| 명령어 | 역할 |
+| Command | Purpose |
 |---|---|
-| `campsite` | 인터랙티브 런처 (프로젝트 + 에이전트 선택) |
-| `campsite init [path]` | 새 프로젝트 부트스트랩 |
-| `campsite sync` | source of truth → 에이전트 네이티브 파일 컴파일 |
-| `campsite sync --adapter=claude` | 특정 에이전트만 컴파일 |
-| `campsite save` | 변경 확인 + 컴파일 파일 정리 + lock 해제 |
-| `campsite status` | 현재 프로젝트 상태 요약 |
-| `campsite validate` | 구조 + 신선도 검증 |
-| `campsite recover` | 비정상 종료 후 orphaned lock 정리 |
-| `campsite dashboard` | 전체 프로젝트 현황 |
-| `campsite workspace set <path>` | workspace 루트 설정 |
-| `campsite --version` | 버전 출력 |
+| `campsite` | Interactive launcher |
+| `campsite setup` | First-run workspace setup |
+| `campsite init [path]` | Bootstrap a new project |
+| `campsite sync` | Compile project state into agent-native context files |
+| `campsite save` | End-of-session cleanup |
+| `campsite status` | Show current project summary |
+| `campsite peek` | View the active session from another terminal |
+| `campsite camp overview` | Show recovery-first camp summary |
+| `campsite camp render` | Render the local camp scene |
+| `campsite validate` | Check structure and freshness |
+| `campsite recover` | Recover orphaned sessions and stale artifacts |
+| `campsite dashboard` | Show all projects in workspace |
+
+More detail:
+
+- [docs/guide.md](docs/guide.md)
+- [docs/reference.md](docs/reference.md)
+- [docs/spec-driven-prd-vibe-camp.md](docs/spec-driven-prd-vibe-camp.md)
 
 ---
 
-## 프로젝트 구조
+## Non-Goals
 
-`campsite init`이 생성하는 파일:
+Campsite is not trying to be:
 
-```
-my-app/
-├── README.md        # 프로젝트 설명 (stable)
-├── status.md        # 현재 상태 (volatile, source of truth)
-├── handoff.md       # 다음 작업 (volatile, source of truth)
-├── decisions.md     # 의사결정 로그 (append-only)
-├── .gitignore       # CLAUDE.md 등 컴파일 파일 제외 포함
-└── .campsite/       # campsite 내부 데이터 (hash, lock)
-```
+- a full IDE replacement
+- a hosted orchestration service
+- a generic agent benchmark product
+- a noisy productivity dashboard
 
-`campsite sync`가 생성하는 파일 (`.gitignore` 처리됨):
-
-| 에이전트 | 생성 파일 |
-|---|---|
-| Claude Code | `CLAUDE.md` |
-| OpenAI Codex | `AGENTS.md` |
-| Cursor | `.cursorrules` |
-| GitHub Copilot | `.github/copilot-instructions.md` |
-| Gemini CLI | `GEMINI.md` |
+It is trying to be the workspace where AI coding feels more legible, more reviewable, and more sustainable.
 
 ---
 
-## 어댑터 시스템
+## Long-Term Direction
 
-새 AI 에이전트 추가는 파일 하나면 충분:
+The solo builder is the first wedge.
 
-```bash
-cat > ~/.campsite/user/adapters/my-agent.sh << 'ADAPTER'
-name: my-agent
-context-file: .my-agent-context.md
-location: project-root
-format: markdown
-command: my-agent
-sections: status handoff decisions readme
-ADAPTER
-```
+Later, Campsite should naturally extend into a shared world where:
 
-이후 `campsite sync`가 자동으로 `.my-agent-context.md`를 생성한다.
+- multiple people gather in the same camp
+- missions are discussed in one place
+- branches and work threads are handed off cleanly
+- context moves between people without coordination collapse
+
+But the first rule remains the same:
+
+make the return feel good.
 
 ---
 
-## 멀티 터미널 안전성
+## Links
 
-```bash
-# 터미널 A — 프로젝트 진입
-campsite sync   # lock 획득
-
-# 터미널 B — 같은 프로젝트 진입 시도
-campsite sync   # → "project locked by user (claude on mac)" 오류
-
-# 터미널 A 비정상 종료 후 복구
-campsite recover  # → orphaned lock 자동 정리
-```
-
----
-
-## 크로스 디바이스 워크플로
-
-```bash
-# MacBook에서 작업 종료
-campsite save
-git add status.md handoff.md decisions.md
-git commit -m "wip: auth-service session"
-git push
-
-# 다른 기기에서 재개
-git pull
-campsite sync   # 어제 상태 그대로 컴파일
-claude          # 첫 발화에 프로젝트명, phase, next task 포함
-```
-
----
-
-## 제거
-
-```bash
-# 설치 파일 제거 (user config 보존)
-rm -rf ~/.campsite/bin ~/.campsite/lib ~/.campsite/adapters \
-       ~/.campsite/templates ~/.campsite/config ~/.campsite/version
-
-# 완전 제거
-rm -rf ~/.campsite
-
-# 그 다음 ~/.bashrc, ~/.zshrc, ~/.profile에서 CAMPSITE_HOME 줄 삭제
-```
-
----
-
-## 설치 위치
-
-```
-~/.campsite/
-  bin/campsite          ← PATH에 추가되는 실행 파일
-  lib/                  ← bash 라이브러리 모듈
-  adapters/             ← 내장 어댑터 (claude, codex, cursor, copilot, gemini)
-  templates/            ← 프로젝트 부트스트랩 템플릿
-  config/defaults.sh    ← 기본 설정
-  user/
-    config.sh           ← 사용자 설정 (덮어쓰지 않음)
-    adapters/           ← 커스텀 어댑터
-  history               ← 세션 이력 (로컬 전용)
-  version               ← 버전 파일
-```
-
----
-
-## 문서 (Documentation)
-
-| 문서 | 역할 |
-|------|------|
-| [docs/landing.md](docs/landing.md) | 제품 소개 · ICP · 반례 (Anti-patterns) · 크로스 디바이스 가치 |
-| [docs/guide.md](docs/guide.md) | 사용 튜토리얼 (설치 → 일상 워크플로) |
-| [docs/reference.md](docs/reference.md) | CLI / 설정 / 어댑터 스펙 레퍼런스 |
-| [docs/CIP.md](docs/CIP.md) | Continuous Improvement Projects (로드맵) |
-| [docs/improvement-plan.md](docs/improvement-plan.md) | 기술 개선 계획 |
-
----
-
-## GitHub
-
-**https://github.com/ReliOptic/campsite**
-
-```bash
-# 업데이트
-curl -fsSL https://raw.githubusercontent.com/ReliOptic/campsite/main/install.sh | bash
-```
+- [Guide](docs/guide.md)
+- [Reference](docs/reference.md)
+- [Design System](docs/DESIGN.md)
+- [Family Look Spec](docs/family-look-spec.md)
+- [Camp State Schema](docs/camp-state-schema.md)
+- [Recovery-First PRD](docs/spec-driven-prd-vibe-camp.md)
+- [GitHub](https://github.com/ReliOptic/campsite)

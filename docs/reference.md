@@ -4,6 +4,9 @@
 >
 > For narrative usage guide, see [guide.md](guide.md).
 > For product overview, see [landing.md](landing.md).
+> For recovery-first product direction, see [spec-driven-prd-vibe-camp.md](spec-driven-prd-vibe-camp.md).
+> For family look rules across Camp mode and Focus mode, see [family-look-spec.md](family-look-spec.md).
+> For terminal foundation boundaries, see [libghostty-foundation-boundary.md](libghostty-foundation-boundary.md).
 
 ---
 

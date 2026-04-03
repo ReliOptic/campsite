@@ -4,6 +4,7 @@
 > Status: Draft
 > Last updated: 2026-04-03
 > Based on: `docs/office-hours-vibe-camp-design.md`
+> Foundation boundary: `docs/libghostty-foundation-boundary.md`
 
 ## 1. Product Summary
 
@@ -232,6 +233,20 @@ Instead, work is represented by fire-state phases:
 - NFR3: The system should degrade gracefully when a participant exits unexpectedly.
 - NFR4: The visual layer should feel expressive but remain lightweight enough for a local-first CLI tool.
 - NFR5: The state model should be stable enough that users learn the metaphor after a few sessions.
+
+## 12.1 Foundation Boundary
+
+If Campsite adopts a stronger terminal foundation such as `libghostty`, that layer must remain a foundation, not a product identity.
+
+The boundary is:
+
+- terminal rendering and embedding may be delegated downward
+- mission language, fire-state semantics, recovery UX, tranquil autonomy, and family look stay owned by Campsite
+
+See:
+
+- `docs/libghostty-foundation-boundary.md`
+- `docs/family-look-spec.md`
 
 ## 13. UX Spec
 
