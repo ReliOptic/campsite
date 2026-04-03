@@ -216,7 +216,9 @@ camp_session_start() {
     local participant_id summary next_action
     participant_id="$(camp_session_participant_id "$tool" "$pid")"
     next_action="$(field_value "$project_root/handoff.md" "task" 2>/dev/null || echo "")"
-    summary="Active session in ${terminal:-terminal}. Working through the current mission."
+    local mission_short
+    mission_short="$(printf '%s' "$next_action" | cut -c1-80)"
+    summary="${tool} session active in ${terminal:-terminal}. Mission: ${mission_short:-unknown}."
 
     cat > "$(camp_session_snapshot_path "$project_root" "$participant_id")" <<EOF
 started-at: $(now_iso)
@@ -230,7 +232,7 @@ last-device: $(field_value "$project_root/status.md" "last-device" 2>/dev/null |
 EOF
 
     camp_participant_upsert "$project_root" "$participant_id" "$tool" "agent" "$tool" "$terminal" "modakbul" "$summary" "" "$next_action" "25"
-    camp_event_append "$project_root" "$participant_id" "" "modakbul" "Session started in ${terminal:-terminal}."
+    camp_event_append "$project_root" "$participant_id" "" "modakbul" "${tool} started in ${terminal:-terminal}."
     printf '%s' "$participant_id"
 }
 
@@ -253,8 +255,8 @@ camp_session_finish() {
 
     if [[ "$outcome" != "normal" ]]; then
         new_state="yeongi"
-        new_summary="Session ended abnormally. Human review is needed before trusting the result."
-        blocker="Session ended unexpectedly."
+        new_summary="${stored_tool} session ended abnormally. Review before trusting the result."
+        blocker="Unexpected exit from ${stored_tool} in ${terminal:-terminal}."
     elif [[ "$state_changed" == "1" ]]; then
         new_state="deungbul"
         local old_phase new_phase old_task new_task old_confidence new_confidence changes=""
@@ -274,12 +276,12 @@ camp_session_finish() {
         if [[ -n "$old_confidence" && -n "$new_confidence" && "$old_confidence" != "$new_confidence" ]]; then
             changes="${changes}confidence ${old_confidence} -> ${new_confidence}. "
         fi
-        [[ -n "$changes" ]] || changes="status or handoff changed during the session. "
-        new_summary="Session ended with updated project state. ${changes}Review the latest handoff and decide the next move."
+        [[ -n "$changes" ]] || changes="state updated. "
+        new_summary="${stored_tool} finished with changes: ${changes}Review the handoff."
         blocker=""
     else
         new_state="jangjak"
-        new_summary="Session ended without updating status files. The next action is prepared for the next resume from ${terminal:-this terminal}."
+        new_summary="${stored_tool} session ended. No state updates. Ready to resume from ${terminal:-terminal}."
         blocker=""
     fi
 
@@ -410,22 +412,14 @@ camp_render() {
     participants_file="$(camp_participants_path "$project_root")"
     events_file="$(camp_events_path "$project_root")"
 
-    local project_name phase confidence last_updated mission_title mission_summary mission_next_action
+    local project_name mission_title mission_next_action
     project_name="$(basename "$project_root")"
-    phase="$(field_value "$project_root/status.md" "phase" 2>/dev/null || echo "building")"
-    confidence="$(field_value "$project_root/status.md" "confidence" 2>/dev/null || echo "medium")"
-    last_updated="$(field_value "$project_root/status.md" "last-updated" 2>/dev/null || echo "$(today_date)")"
     mission_title="$(camp_field_get "$mission_file" "title")"
-    mission_summary="$(camp_field_get "$mission_file" "summary")"
     mission_next_action="$(camp_field_get "$mission_file" "next-action")"
 
-    local project_name_html phase_html confidence_html last_updated_html mission_title_html mission_summary_html mission_next_action_html
+    local project_name_html mission_title_html mission_next_action_html
     project_name_html="$(printf '%s' "$project_name" | camp_html_escape)"
-    phase_html="$(printf '%s' "$phase" | camp_html_escape)"
-    confidence_html="$(printf '%s' "$confidence" | camp_html_escape)"
-    last_updated_html="$(printf '%s' "$last_updated" | camp_html_escape)"
     mission_title_html="$(printf '%s' "$mission_title" | camp_html_escape)"
-    mission_summary_html="$(printf '%s' "$mission_summary" | camp_html_escape)"
     mission_next_action_html="$(printf '%s' "$mission_next_action" | camp_html_escape)"
 
     local active_line waiting_line next_line
@@ -438,229 +432,362 @@ camp_render() {
     done < <(camp_overview_lines "$project_root")
 
     local active_line_html waiting_line_html next_line_html
-    active_line_html="$(printf '%s' "${active_line:-none}" | camp_html_escape)"
-    waiting_line_html="$(printf '%s' "${waiting_line:-none}" | camp_html_escape)"
+    active_line_html="$(printf '%s' "${active_line:-none yet}" | camp_html_escape)"
+    waiting_line_html="$(printf '%s' "${waiting_line:-none waiting}" | camp_html_escape)"
     next_line_html="$(printf '%s' "${next_line:-none}" | camp_html_escape)"
 
-    local participant_cards=""
+    # Build participant JSON via awk to avoid bash read empty-field bug
+    local participant_json
+    participant_json="$(awk -F'\t' '
+        function esc(s) { gsub(/\\/, "\\\\", s); gsub(/"/, "\\\"", s); gsub(/\n/, " ", s); return s }
+        NR == 1 { next }
+        {
+            if (NR > 2) printf ","
+            printf "{\"name\":\"%s\",\"state\":\"%s\",\"summary\":\"%s\",\"blocker\":\"%s\",\"next\":\"%s\",\"tool\":\"%s\",\"terminal\":\"%s\"}",
+                esc($2), esc($6), esc($7), esc($8), esc($9), esc($4), esc($5)
+        }
+    ' "$participants_file")"
+
     local participant_count
     participant_count="$(camp_participant_count "$project_root")"
-    local idx=0
-    while IFS=$'\t' read -r _priority id name ptype tool terminal fire_state summary blocker next_action row_updated priority; do
-        idx=$((idx + 1))
-        local card_class="participant-${idx}"
-        if [[ $idx -gt 4 ]]; then
-            card_class="participant-extra"
-        fi
-        local state_label=""
-        case "$fire_state" in
-            bulssi) state_label="불씨" ;;
-            modakbul) state_label="모닥불" ;;
-            deungbul) state_label="등불" ;;
-            yeongi) state_label="연기" ;;
-            jangjak) state_label="장작" ;;
-            *) state_label="$fire_state" ;;
-        esac
-        local body="$summary"
-        [[ -n "$body" ]] || body="No summary captured yet."
-        if [[ -n "$blocker" ]]; then
-            body="$body Blocker: $blocker"
-        elif [[ -n "$next_action" ]]; then
-            body="$body Next: $next_action"
-        fi
-        participant_cards="${participant_cards}
-          <article class=\"participant ${card_class}\" data-state=\"$(printf '%s' "$fire_state" | camp_html_escape)\">
-            <header>
-              <h3 class=\"participant-name\">$(printf '%s' "$name" | camp_html_escape)</h3>
-              <span class=\"state-chip state-$(printf '%s' "$fire_state" | camp_html_escape)\">$(printf '%s' "$state_label" | camp_html_escape)</span>
-            </header>
-            <p>$(printf '%s' "$body" | camp_html_escape)</p>
-            <div class=\"meta\">$(printf '%s' "$ptype" | camp_html_escape) • $(printf '%s' "$tool" | camp_html_escape) • $(printf '%s' "$terminal" | camp_html_escape)</div>
-          </article>"
-    done < <(camp_render_participants_dataset "$project_root")
 
-    if [[ "$participant_count" -eq 0 ]]; then
-        participant_cards='
-          <article class="participant participant-empty" data-state="quiet">
-            <header>
-              <h3 class="participant-name">Quiet camp</h3>
-              <span class="state-chip state-quiet">Awaiting entry</span>
-            </header>
-            <p>No agents are in the camp yet. Start from Focus mode, or add a participant when a real session begins.</p>
-            <div class="meta">mission • recovery-first • truthful empty state</div>
-          </article>'
+    # Last activity timestamp for "last seen" display
+    local last_activity_iso=""
+    if [[ -f "$events_file" ]]; then
+        last_activity_iso="$(tail -1 "$events_file" | cut -f1)"
+    fi
+    local last_activity_html=""
+    if [[ -n "$last_activity_iso" ]]; then
+        last_activity_html="$(printf '%s' "$last_activity_iso" | camp_html_escape)"
     fi
 
-    local activity_items=""
-    local event_count=0
-    while IFS=$'\t' read -r created_at participant_id from_state to_state summary; do
-        [[ "$created_at" == "created_at" ]] && continue
-        event_count=$((event_count + 1))
-        local participant_name
-        participant_name="$(camp_participant_get "$project_root" "$participant_id" | awk -F'\t' 'NR == 1 { print $2 }')"
-        [[ -n "$participant_name" ]] || participant_name="$participant_id"
-        activity_items="<article class=\"activity-item\">
-        <div class=\"event-time\">$(printf '%s' "$created_at" | camp_html_escape)</div>
-        <p><strong>$(printf '%s' "$participant_name" | camp_html_escape)</strong> moved to <span class=\"state-chip state-$(printf '%s' "$to_state" | camp_html_escape)\">$(printf '%s' "$to_state" | camp_html_escape)</span>. $(printf '%s' "$summary" | camp_html_escape)</p>
-      </article>
-${activity_items}"
-        [[ $event_count -ge 4 ]] && break
-    done < <(tac "$events_file" 2>/dev/null || tail -r "$events_file" 2>/dev/null || cat "$events_file")
+    # Check for campfire-core asset (base64 inline if small enough)
+    local campfire_b64=""
+    local export_dir
+    export_dir="$(printf '%s/design/export' "$project_root")"
+    local campfire_file=""
+    for f in "$export_dir"/campfire-core*.png "$export_dir"/campfire-core*.webp "$export_dir"/campfire-core*.svg; do
+        if [[ -f "$f" ]]; then
+            # Only inline if under 15KB
+            local fsize
+            fsize="$(wc -c < "$f" | tr -d ' ')"
+            if [[ "$fsize" -lt 15360 ]]; then
+                campfire_b64="$(camp_assets_base64 "$f" 2>/dev/null || true)"
+            fi
+            break
+        fi
+    done
 
-    [[ -n "$activity_items" ]] || activity_items='<article class="activity-item"><div class="event-time">now</div><p>No camp events yet.</p></article>'
-
-    cat > "$output_path" <<EOF
+    cat > "$output_path" <<'HTMLEOF'
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${project_name_html} Camp</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <title>Camp</title>
   <style>
     :root {
-      --bg: #131318;
-      --surface-low: #1b1b20;
-      --surface-high: #2a292f;
-      --surface-top: #35343a;
-      --text: #e4e1e9;
-      --muted: #bac8dc;
-      --tertiary: #00dce5;
-      --ember: #ff9f4a;
-      --review: #f6d365;
-      --smoke: #8fa1b3;
-      --ready: #7fd98f;
-      --shadow: rgba(228, 225, 233, 0.06);
+      --bg: #131318; --surface: #1b1b20; --card: #222228;
+      --text: #e4e1e9; --muted: #8a8a9a;
+      --ember: #ff9f4a; --review: #f6d365; --smoke: #8fa1b3; --ready: #7fd98f; --cyan: #00dce5;
     }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-      color: var(--text);
-      background:
-        radial-gradient(circle at top, rgba(0,220,229,0.10), transparent 30%),
-        radial-gradient(circle at bottom, rgba(255,159,74,0.12), transparent 35%),
-        linear-gradient(180deg, #17171d 0%, var(--bg) 50%, #0f1014 100%);
-    }
-    .app { min-height: 100vh; display: grid; grid-template-columns: 240px 1fr 320px; grid-template-rows: auto 1fr auto; gap: 16px; padding: 18px; }
-    .topbar, .rail, .return-panel, .activity, .scene-shell { background: var(--surface-low); box-shadow: 0 0 0 1px rgba(255,255,255,0.02), 0 18px 48px var(--shadow); }
-    .topbar { grid-column: 1 / 4; display: flex; justify-content: space-between; align-items: center; padding: 16px 18px; }
-    .brand { display: flex; flex-direction: column; gap: 4px; }
-    .eyebrow, .meta, .event-time { font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
-    .title, .panel-title, .mission-title { font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif; margin: 0; }
-    .top-stats { display: flex; gap: 18px; flex-wrap: wrap; justify-content: flex-end; }
-    .stat { background: var(--surface-high); padding: 10px 12px; min-width: 120px; }
-    .stat strong { display: block; margin-top: 4px; color: var(--text); font-size: 14px; }
-    .rail { padding: 18px; display: flex; flex-direction: column; gap: 18px; }
-    .rail-block, .return-block, .participant, .mission-card, .activity-item { background: var(--surface-high); padding: 14px; }
-    .scene-shell { padding: 18px; display: flex; flex-direction: column; gap: 16px; }
-    .scene { flex: 1; min-height: 540px; background: linear-gradient(180deg, rgba(0,0,0,0.10), rgba(0,0,0,0.25)), linear-gradient(0deg, rgba(44,73,54,0.35), rgba(44,73,54,0.02) 36%), var(--surface-top); position: relative; overflow: hidden; padding: 24px; }
-    .scene::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 24px 24px; opacity: 0.12; pointer-events: none; }
-    .mission-card { position: absolute; left: 50%; top: 52%; transform: translate(-50%, -50%); width: min(360px, calc(100% - 48px)); padding: 18px; background: radial-gradient(circle at top, rgba(255,159,74,0.26), transparent 45%), linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02)), #2d2621; box-shadow: 0 0 32px rgba(255,159,74,0.18); z-index: 2; }
-    .mission-title { font-size: 24px; margin-bottom: 8px; }
-    .mission-summary { margin: 0 0 12px; color: var(--text); line-height: 1.5; }
-    .cta { display: inline-block; padding: 10px 12px; background: linear-gradient(180deg, rgba(0,220,229,0.85), rgba(0,220,229,0.65)); color: #071013; font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
-    .participant-grid { position: relative; min-height: 100%; z-index: 1; }
-    .participant { position: absolute; width: 210px; box-shadow: 0 0 0 1px rgba(255,255,255,0.02); }
-    .participant[data-state="modakbul"] { box-shadow: 0 0 20px rgba(255,159,74,0.18); }
-    .participant[data-state="deungbul"] { box-shadow: 0 0 20px rgba(246,211,101,0.16); }
-    .participant[data-state="yeongi"] { box-shadow: 0 0 20px rgba(143,161,179,0.14); }
-    .participant[data-state="jangjak"] { box-shadow: 0 0 20px rgba(127,217,143,0.14); }
-    .participant[data-state="quiet"] { box-shadow: 0 0 20px rgba(186,200,220,0.08); }
-    .participant-1 { left: 4%; top: 14%; }
-    .participant-2 { right: 5%; top: 12%; }
-    .participant-3 { left: 10%; bottom: 10%; }
-    .participant-4 { right: 8%; bottom: 14%; }
-    .participant-extra { left: 50%; bottom: 2%; transform: translateX(-50%); width: min(540px, calc(100% - 48px)); }
-    .participant-empty { left: 50%; bottom: 8%; transform: translateX(-50%); width: min(540px, calc(100% - 48px)); }
-    .participant header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
-    .participant-name { margin: 0; font-size: 17px; font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif; }
-    .state-chip { padding: 4px 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif; }
-    .state-bulssi { background: rgba(255,159,74,0.12); color: var(--ember); }
-    .state-modakbul { background: rgba(255,159,74,0.18); color: #ffbf7e; }
-    .state-deungbul { background: rgba(246,211,101,0.16); color: var(--review); }
-    .state-yeongi { background: rgba(143,161,179,0.15); color: #d5e2ee; }
-    .state-jangjak { background: rgba(127,217,143,0.16); color: var(--ready); }
-    .state-quiet { background: rgba(186,200,220,0.10); color: var(--muted); }
-    .participant p, .return-block p, .rail-block p, .activity-item p { margin: 0; color: var(--text); line-height: 1.45; font-size: 14px; }
-    .participant .meta { margin-top: 10px; }
-    .return-panel { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
-    .panel-title { font-size: 20px; margin: 0 0 4px; }
-    .return-block strong { display: block; margin-bottom: 8px; font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; }
-    .activity { grid-column: 1 / 4; padding: 14px 18px 18px; display: grid; gap: 10px; }
-    .activity-item { display: grid; grid-template-columns: 140px 1fr; gap: 12px; align-items: start; }
-    .legend { display: grid; gap: 8px; }
-    .legend-row { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
-    .footer-note { color: var(--muted); font-size: 12px; line-height: 1.5; }
-    @media (max-width: 1120px) { .app { grid-template-columns: 1fr; grid-template-rows: auto auto auto auto auto; } .topbar, .activity { grid-column: 1; } .scene { min-height: 640px; } .participant-1 { left: 2%; top: 8%; } .participant-2 { right: 2%; top: 8%; } .participant-3 { left: 5%; bottom: 7%; } .participant-4 { right: 5%; bottom: 7%; } .participant-extra { left: 50%; bottom: 3%; } }
-    @media (max-width: 720px) { .scene { min-height: 920px; } .mission-card { position: relative; left: auto; top: auto; transform: none; width: 100%; margin-bottom: 16px; } .participant { position: relative; width: 100%; left: auto; right: auto; top: auto; bottom: auto; transform: none; margin-bottom: 12px; } .participant-grid { display: flex; flex-direction: column; } .activity-item { grid-template-columns: 1fr; } }
+    * { box-sizing: border-box; margin: 0; }
+    body { min-height: 100vh; font-family: Inter, system-ui, sans-serif; color: var(--text); background: var(--bg); overflow-x: hidden; }
+    .camp { max-width: 640px; margin: 0 auto; padding: 48px 24px; position: relative; z-index: 1; }
+
+    /* Header — project name only */
+    .camp-header { margin-bottom: 40px; }
+    .camp-name { font-family: "Space Grotesk", system-ui, sans-serif; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+    /* Night sky */
+    .sky { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+    .star { position: absolute; border-radius: 50%; background: #fff; }
+    .moon-haze { position: absolute; top: -5%; right: 10%; width: 350px; height: 350px; border-radius: 50%; background: radial-gradient(circle, rgba(205,193,224,0.07) 0%, transparent 60%); }
+
+    /* Mission — the campfire */
+    .mission { margin-bottom: 48px; padding: 24px; background: var(--surface); border-left: 3px solid var(--ember); position: relative; }
+    .fire-glow { position: absolute; top: 50%; left: 0; width: 300px; height: 300px; transform: translate(-40%, -50%); background: radial-gradient(circle, rgba(255,159,74,0.14) 0%, rgba(255,159,74,0.05) 35%, transparent 65%); pointer-events: none; animation: flicker 3s ease-in-out infinite alternate; }
+    .mission-label { font-family: "Space Grotesk", system-ui, sans-serif; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ember); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+    .mission-icon { flex-shrink: 0; }
+    .mission-title { font-family: "Space Grotesk", system-ui, sans-serif; font-size: 20px; line-height: 1.4; margin-bottom: 12px; }
+    .mission-next { font-size: 14px; color: var(--cyan); }
+
+    /* Corner accents — 4px pixel neon brackets */
+    .corner-accent { position: absolute; width: 4px; height: 4px; background: var(--cyan); opacity: 0.5; }
+    .corner-accent.br { bottom: 0; right: 0; }
+    .corner-accent.tl { top: 0; left: 0; }
+
+    /* Return rows — the core recovery interface */
+    .return-section { margin-bottom: 40px; }
+    .return-row { padding: 16px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .return-row:first-child { border-top: 1px solid rgba(255,255,255,0.04); }
+    .return-label { font-family: "Space Grotesk", system-ui, sans-serif; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+    .return-value { font-size: 15px; line-height: 1.5; }
+    .return-row[data-type="working"] .return-value { color: var(--ember); }
+    .return-row[data-type="waiting"] .return-value { color: var(--review); }
+    .return-row[data-type="next"] .return-value { color: var(--cyan); }
+
+    /* Participant list — drill-down from return view */
+    .participants { margin-bottom: 40px; }
+    .participants-label { font-family: "Space Grotesk", system-ui, sans-serif; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
+    .participant { padding: 14px 16px; background: var(--surface); margin-bottom: 2px; cursor: pointer; transition: background 0.15s; }
+    .participant:hover { background: var(--card); }
+    .participant-header { display: flex; justify-content: space-between; align-items: center; }
+    .participant-name { font-size: 14px; font-weight: 500; }
+    .state-chip { font-family: "Space Grotesk", system-ui, sans-serif; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 8px; display: inline-flex; align-items: center; gap: 4px; }
+    .state-chip svg { width: 12px; height: 12px; flex-shrink: 0; }
+    .state-modakbul { background: rgba(255,159,74,0.15); color: var(--ember); }
+    .state-deungbul { background: rgba(246,211,101,0.15); color: var(--review); }
+    .state-yeongi { background: rgba(143,161,179,0.15); color: var(--smoke); }
+    .state-yeongi svg { animation: drift 3s ease-in-out infinite alternate; }
+    .state-jangjak { background: rgba(127,217,143,0.15); color: var(--ready); }
+    .state-bulssi { background: rgba(255,159,74,0.08); color: var(--ember); }
+
+    /* Participant detail — hidden by default */
+    .participant-detail { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.04); font-size: 13px; line-height: 1.5; }
+    .participant-detail .detail-label { font-family: "Space Grotesk", system-ui, sans-serif; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 4px; margin-top: 10px; }
+    .participant-detail .detail-label:first-child { margin-top: 0; }
+    .detail-blocker { color: var(--smoke); }
+    .detail-next { color: var(--ready); }
+    .detail-resume { color: var(--cyan); font-family: "Space Grotesk", system-ui, sans-serif; }
+
+    /* Empty state */
+    .empty { padding: 24px; background: var(--surface); color: var(--muted); font-size: 14px; text-align: center; }
+
+    /* Last seen */
+    .last-seen { color: var(--muted); font-size: 12px; margin-bottom: 16px; }
+    .last-seen span { color: var(--text); }
+
+    /* Ground hint */
+    .camp::after { content: ""; display: block; height: 1px; margin-top: 32px; background: linear-gradient(to right, transparent 0%, rgba(143,161,179,0.1) 30%, rgba(143,161,179,0.1) 70%, transparent 100%); }
+
+    /* State summary bar */
+    .state-bar { display: flex; gap: 2px; height: 4px; margin-bottom: 16px; border-radius: 0; overflow: hidden; }
+    .state-bar-seg { height: 100%; transition: width 0.5s ease; }
+
+    /* Footer */
+    .camp-footer { color: var(--muted); font-size: 11px; padding-top: 12px; display: flex; justify-content: space-between; align-items: center; }
+
+    /* Active participant pulse */
+    .participant[data-state="modakbul"] { box-shadow: inset 0 0 0 rgba(255,159,74,0); animation: pulse 3s ease-in-out infinite; }
+
+    /* Animations */
+    @keyframes twinkle { from { opacity: 0.6; } to { opacity: 1; } }
+    @keyframes flicker { 0% { opacity: 0.85; } 50% { opacity: 1; } 100% { opacity: 0.9; } }
+    @keyframes drift { from { transform: translateY(-50%); } to { transform: translateY(calc(-50% - 2px)); } }
+    @keyframes pulse { 0%,100% { box-shadow: inset 0 0 0 rgba(255,159,74,0); } 50% { box-shadow: inset 0 0 12px rgba(255,159,74,0.04); } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
   </style>
 </head>
 <body>
-  <div class="app">
-    <section class="topbar">
-      <div class="brand">
-        <div class="eyebrow">Campsite camp overview</div>
-        <h1 class="title">${project_name_html}</h1>
-        <div class="meta">Recovery-first local scene for returning in under 5 seconds</div>
+  <!-- SVG sprite sheet -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+    <symbol id="ico-campfire" viewBox="0 0 32 32">
+      <rect x="10" y="26" width="12" height="2" fill="#8B5E3C"/>
+      <rect x="8" y="28" width="16" height="2" fill="#6B4226"/>
+      <rect x="14" y="18" width="4" height="8" fill="#ff9f4a"/>
+      <rect x="12" y="16" width="8" height="4" fill="#ff9f4a"/>
+      <rect x="12" y="14" width="8" height="2" fill="#f6d365"/>
+      <rect x="14" y="12" width="4" height="2" fill="#f6d365"/>
+      <rect x="16" y="10" width="2" height="2" fill="#ffe0b2"/>
+    </symbol>
+    <symbol id="ico-bulssi" viewBox="0 0 16 16">
+      <rect x="7" y="10" width="2" height="4" fill="#ff9f4a" opacity="0.6"/>
+      <rect x="7" y="8" width="2" height="2" fill="#ff9f4a" opacity="0.8"/>
+      <rect x="6" y="12" width="4" height="2" fill="#8B5E3C" opacity="0.5"/>
+    </symbol>
+    <symbol id="ico-modakbul" viewBox="0 0 16 16">
+      <rect x="5" y="12" width="6" height="2" fill="#8B5E3C"/>
+      <rect x="6" y="8" width="4" height="4" fill="#ff9f4a"/>
+      <rect x="5" y="6" width="6" height="3" fill="#ff9f4a"/>
+      <rect x="6" y="4" width="4" height="2" fill="#f6d365"/>
+      <rect x="7" y="2" width="2" height="2" fill="#ffe0b2"/>
+    </symbol>
+    <symbol id="ico-deungbul" viewBox="0 0 16 16">
+      <rect x="7" y="10" width="2" height="4" fill="#8a8a9a"/>
+      <rect x="6" y="6" width="4" height="4" fill="#f6d365" opacity="0.9"/>
+      <rect x="5" y="5" width="6" height="1" fill="#f6d365"/>
+      <rect x="5" y="10" width="6" height="1" fill="#8a8a9a"/>
+      <rect x="7" y="4" width="2" height="1" fill="#ffe0b2"/>
+    </symbol>
+    <symbol id="ico-yeongi" viewBox="0 0 16 16">
+      <rect x="7" y="12" width="2" height="2" fill="#8fa1b3" opacity="0.4"/>
+      <rect x="6" y="10" width="2" height="2" fill="#8fa1b3" opacity="0.5"/>
+      <rect x="7" y="8" width="2" height="2" fill="#8fa1b3" opacity="0.6"/>
+      <rect x="8" y="6" width="2" height="2" fill="#8fa1b3" opacity="0.5"/>
+      <rect x="7" y="4" width="2" height="2" fill="#8fa1b3" opacity="0.3"/>
+    </symbol>
+    <symbol id="ico-jangjak" viewBox="0 0 16 16">
+      <rect x="3" y="11" width="10" height="2" fill="#7fd98f" opacity="0.7"/>
+      <rect x="4" y="9" width="8" height="2" fill="#7fd98f" opacity="0.8"/>
+      <rect x="5" y="7" width="6" height="2" fill="#7fd98f" opacity="0.6"/>
+    </symbol>
+  </svg>
+  <div class="sky" id="sky"><div class="moon-haze"></div></div>
+  <div class="camp">
+    <header class="camp-header">
+      <div class="camp-name" id="camp-name"></div>
+      <div class="last-seen" id="last-seen"></div>
+    </header>
+
+    <section class="mission">
+      <div class="fire-glow"></div>
+      <span class="corner-accent br"></span>
+      <div class="mission-label"><svg class="mission-icon" width="18" height="18"><use href="#ico-campfire"/></svg>Mission</div>
+      <h1 class="mission-title" id="mission-title"></h1>
+      <div class="mission-next" id="mission-next"></div>
+    </section>
+
+    <section class="return-section">
+      <div class="return-row" data-type="working">
+        <div class="return-label">Working now</div>
+        <div class="return-value" id="working-now"></div>
       </div>
-      <div class="top-stats">
-        <div class="stat"><div class="eyebrow">Phase</div><strong>${phase_html}</strong></div>
-        <div class="stat"><div class="eyebrow">Confidence</div><strong>${confidence_html}</strong></div>
-        <div class="stat"><div class="eyebrow">Updated</div><strong>${last_updated_html}</strong></div>
-        <div class="stat"><div class="eyebrow">Active camp</div><strong>${participant_count} participants</strong></div>
+      <div class="return-row" data-type="waiting">
+        <div class="return-label">Waiting on you</div>
+        <div class="return-value" id="waiting-on-you"></div>
+      </div>
+      <div class="return-row" data-type="next">
+        <div class="return-label">Next move</div>
+        <div class="return-value" id="next-move"></div>
       </div>
     </section>
-    <aside class="rail">
-      <section class="rail-block">
-        <div class="eyebrow">Terminal rail</div>
-        <p><strong>Workspace:</strong> ${project_name_html}</p>
-        <p><strong>Mission:</strong> ${mission_title_html}</p>
-        <p><strong>Resume path:</strong> re-enter camp, inspect return panel, choose one action</p>
-      </section>
-      <section class="rail-block">
-        <div class="eyebrow">State legend</div>
-        <div class="legend">
-          <div class="legend-row"><span class="state-chip state-bulssi">불씨</span> newly started, still weak</div>
-          <div class="legend-row"><span class="state-chip state-modakbul">모닥불</span> active focused execution</div>
-          <div class="legend-row"><span class="state-chip state-deungbul">등불</span> ready for human review</div>
-          <div class="legend-row"><span class="state-chip state-yeongi">연기</span> blocked, needs help</div>
-          <div class="legend-row"><span class="state-chip state-jangjak">장작</span> next action prepared</div>
-        </div>
-      </section>
-      <section class="rail-block">
-        <div class="eyebrow">Prototype note</div>
-        <p class="footer-note">This scene is now backed by local camp state files. UI is a consumer, not the source of truth.</p>
-      </section>
-    </aside>
-    <main class="scene-shell">
-      <div class="eyebrow">Camp scene</div>
-      <section class="scene">
-        <article class="mission-card">
-          <div class="eyebrow">Campfire mission</div>
-          <h2 class="mission-title">${mission_title_html}</h2>
-          <p class="mission-summary">${mission_summary_html}</p>
-          <span class="cta">Next: ${mission_next_action_html}</span>
-        </article>
-        <div class="participant-grid">
-${participant_cards}
-        </div>
-      </section>
-    </main>
-    <aside class="return-panel">
-      <div><div class="eyebrow">Return panel</div><h2 class="panel-title">Read the camp fast</h2></div>
-      <section class="return-block"><strong>Working now</strong><p>${active_line_html}</p></section>
-      <section class="return-block"><strong>Waiting on you</strong><p>${waiting_line_html}</p></section>
-      <section class="return-block"><strong>Next move</strong><p>${next_line_html}</p></section>
-    </aside>
-    <section class="activity">
-      <div class="eyebrow">Recent camp events</div>
-${activity_items}
+
+    <section class="participants">
+      <div class="participants-label" id="participants-label"></div>
+      <div id="participant-list"></div>
     </section>
+
+    <div class="state-bar" id="state-bar"></div>
+    <footer class="camp-footer">
+      <span id="camp-footer"></span>
+      <span id="camp-streak" style="color:var(--ember);font-size:10px"></span>
+    </footer>
   </div>
+  <script>
+HTMLEOF
+
+    # Inject data as JS
+    cat >> "$output_path" <<EOF
+    const DATA = {
+      name: "${project_name_html}",
+      mission: "${mission_title_html}",
+      missionNext: "${mission_next_action_html}",
+      workingNow: "${active_line_html}",
+      waitingOnYou: "${waiting_line_html}",
+      nextMove: "${next_line_html}",
+      participantCount: ${participant_count},
+      participants: [${participant_json}],
+      lastActivity: "${last_activity_html}"
+    };
+EOF
+
+    # Inject campfire asset if available
+    if [[ -n "$campfire_b64" ]]; then
+        cat >> "$output_path" <<EOF
+    document.querySelector(".fire-glow").style.backgroundImage = "url(${campfire_b64})";
+    document.querySelector(".fire-glow").style.backgroundSize = "contain";
+    document.querySelector(".fire-glow").style.backgroundRepeat = "no-repeat";
+    document.querySelector(".fire-glow").style.backgroundPosition = "center";
+    document.querySelector(".fire-glow").style.opacity = "0.6";
+EOF
+    fi
+
+    cat >> "$output_path" <<'HTMLEOF'
+    const stateLabels = {bulssi:"불씨",modakbul:"모닥불",deungbul:"등불",yeongi:"연기",jangjak:"장작"};
+
+    document.getElementById("camp-name").textContent = DATA.name;
+    if (DATA.lastActivity) {
+      const ago = (function(iso) {
+        const d = new Date(iso), now = new Date(), s = Math.floor((now - d) / 1000);
+        if (s < 60) return "방금 전";
+        if (s < 3600) return Math.floor(s/60) + "분 전";
+        if (s < 86400) return Math.floor(s/3600) + "시간 전";
+        return Math.floor(s/86400) + "일 전";
+      })(DATA.lastActivity);
+      document.getElementById("last-seen").innerHTML = "마지막으로 여기 있었어요: <span>" + ago + "</span>";
+    }
+    document.getElementById("mission-title").textContent = DATA.mission;
+    document.getElementById("mission-next").textContent = DATA.missionNext ? "→ " + DATA.missionNext : "";
+    document.getElementById("working-now").textContent = DATA.workingNow;
+    document.getElementById("waiting-on-you").textContent = DATA.waitingOnYou;
+    document.getElementById("next-move").textContent = DATA.nextMove;
+    document.getElementById("camp-footer").textContent = DATA.participantCount + " participants in camp";
+
+    const list = document.getElementById("participant-list");
+    if (DATA.participants.length === 0) {
+      list.innerHTML = '<div class="empty"><svg width="24" height="24" style="opacity:0.4;margin-bottom:8px"><use href="#ico-campfire"/></svg><div>조용한 밤이에요.</div><div style="margin-top:6px;color:var(--cyan);font-size:12px">첫 미션을 정해보세요 — campsite camp mission set &quot;...&quot;</div></div>';
+      document.getElementById("participants-label").textContent = "";
+    } else {
+      document.getElementById("participants-label").textContent = "In the camp";
+      DATA.participants.forEach(p => {
+        const el = document.createElement("div");
+        el.className = "participant";
+        el.setAttribute("data-state", p.state);
+        const label = stateLabels[p.state] || p.state;
+        let detailHtml = '<span class="detail-label">Summary</span>' + esc(p.summary);
+        if (p.blocker) detailHtml += '<span class="detail-label">Blocker</span><span class="detail-blocker">' + esc(p.blocker) + '</span>';
+        if (p.next) detailHtml += '<span class="detail-label">Next action</span><span class="detail-next">' + esc(p.next) + '</span>';
+        detailHtml += '<span class="detail-label">Resume</span><span class="detail-resume">' + esc(p.tool) + ' in ' + esc(p.terminal) + '</span>';
+        const icoSvg = '<svg width="12" height="12"><use href="#ico-' + p.state + '"/></svg>';
+        el.innerHTML = '<div class="participant-header"><span class="participant-name">' + esc(p.name) + '</span><span class="state-chip state-' + p.state + '">' + icoSvg + label + '</span></div><div class="participant-detail">' + detailHtml + '</div>';
+        el.onclick = () => {
+          const d = el.querySelector(".participant-detail");
+          d.style.display = d.style.display === "block" ? "none" : "block";
+        };
+        list.appendChild(el);
+      });
+    }
+
+    function esc(s) {
+      if (!s) return "";
+      const d = document.createElement("div"); d.textContent = s; return d.innerHTML;
+    }
+
+    // State summary bar
+    (function() {
+      const colors = {modakbul:"var(--ember)",deungbul:"var(--review)",yeongi:"var(--smoke)",jangjak:"var(--ready)",bulssi:"rgba(255,159,74,0.4)"};
+      const counts = {};
+      DATA.participants.forEach(p => { counts[p.state] = (counts[p.state]||0) + 1; });
+      const bar = document.getElementById("state-bar");
+      const total = DATA.participants.length || 1;
+      ["modakbul","deungbul","yeongi","jangjak","bulssi"].forEach(s => {
+        if (!counts[s]) return;
+        const seg = document.createElement("div");
+        seg.className = "state-bar-seg";
+        seg.style.width = (counts[s]/total*100) + "%";
+        seg.style.background = colors[s];
+        seg.title = s + ": " + counts[s];
+        bar.appendChild(seg);
+      });
+    })();
+
+    // Generate stars
+    (function() {
+      const sky = document.getElementById("sky");
+      const count = 35;
+      for (let i = 0; i < count; i++) {
+        const s = document.createElement("div");
+        s.className = "star";
+        const size = Math.random() > 0.7 ? 2 : 1;
+        s.style.width = size + "px";
+        s.style.height = size + "px";
+        s.style.left = (Math.random() * 100) + "vw";
+        s.style.top = (Math.random() * 60) + "vh";
+        s.style.opacity = 0.3 + Math.random() * 0.5;
+        s.style.animationDuration = (4 + Math.random() * 4) + "s";
+        s.style.animationDelay = (Math.random() * 4) + "s";
+        s.style.animation = "twinkle " + (4 + Math.random()*4).toFixed(1) + "s ease-in-out " + (Math.random()*4).toFixed(1) + "s infinite alternate";
+        sky.appendChild(s);
+      }
+    })();
+  </script>
 </body>
 </html>
-EOF
+HTMLEOF
 
     printf '%s' "$output_path"
 }
@@ -675,5 +802,6 @@ camp_open_browser() {
         xdg-open "$file_path" >/dev/null 2>&1 &
         return 0
     fi
+    warn "could not open browser. Open manually: $file_path"
     return 1
 }

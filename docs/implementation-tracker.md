@@ -100,7 +100,37 @@ Completed in this slice so far:
 - removed over-talkative seeded camp participants in favor of a truthful quiet-camp empty state
 - fixed manual participant enter/update flows so terminal metadata no longer shifts columns
 
+### Step 5b. Session Summary Quality and Terminal Vocabulary Alignment
+
+Status: `completed`
+
+Completed work:
+
+- session start/finish summaries now include tool name, terminal, and mission context
+- peek labels changed from camp-now/camp-wait/camp-next to working-now/waiting-on-you/next-move (family-look vocabulary)
+- status output restructured: mission → camp lines (alive/needs/next) → operational metadata
+- duplicate mission/next-move removed from status
+- sync output now shows brief mission context after compile
+- save output now shows next-move after completion
+- all tests updated to match new label format
+- hybrid smoke passes
+
+### Step 6. MVP Bug Fixes and Polish
+
+Status: `completed`
+
+Completed work:
+
+- fixed `validate` command: `[[ ! ... =~ ... ]]` under `set -e` killed script when phase was valid — replaced with for-loop match; also fixed `&& warn` at end of `_validate_project` returning non-zero
+- fixed `install.sh`: removed false bash 4+ requirement (no `declare -A` in codebase, actual minimum is bash 3.2)
+- fixed `campsite go`: history now bootstrapped on `sync` so `go` works from first session; fixed `tac` not available on macOS by adding `tail -r` and awk fallback
+- added Google Fonts CDN (Inter + Space Grotesk) to camp render HTML
+- added failure message to `camp_open_browser` when neither `open` nor `xdg-open` available
+- improved zero-adapter message in `sync` with specific install guidance
+- added `make test-hybrid` step to CI workflow
+
 ## Current Next Move
 
-- tighten the bridge between Camp mode and Focus mode
-- strengthen live participant summaries and terminal-side copy now that sparse camp behavior is truthful
+- interactive launcher와 setup 흐름 점검 (TTY 환경 필요)
+- freshness를 launcher confidence에 반영하는 단계 검토
+- camp render HTML return panel과 terminal output label 일관성 최종 점검

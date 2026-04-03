@@ -30,6 +30,7 @@ source "$CAMPSITE_LIB/compile.sh"
 source "$CAMPSITE_LIB/history.sh"
 source "$CAMPSITE_LIB/ui.sh"
 source "$CAMPSITE_LIB/camp.sh"
+source "$CAMPSITE_LIB/camp-assets.sh"
 
 # --- Load defaults ---
 if [[ -f "$CAMPSITE_ROOT/config/defaults.sh" ]]; then
@@ -65,6 +66,7 @@ usage:
   campsite recover        Clear orphaned locks + stale files
   campsite dashboard      All projects overview
   campsite camp           Camp state commands and local recovery-first scene
+  campsite camp serve     Live camp server with auto-refresh (http://localhost:8470)
   campsite workspace set <path>   Set workspace root
 
   campsite --version      Print version
@@ -254,8 +256,9 @@ cmd_sync() {
         done < <(adapter_list 2>/dev/null)
 
         if [[ $count -eq 0 ]]; then
-            warn "no agent commands found in PATH. Compiled 0 files."
-            warn "install an AI coding agent (claude, codex, gemini, etc.) or use --adapter=<name>"
+            warn "no agent commands found in PATH"
+            printf "  Install one of: claude, codex, gemini, copilot, cursor\n" >&2
+            printf "  Or compile for a specific adapter: campsite sync --adapter=claude\n" >&2
         fi
     fi
 
@@ -263,6 +266,17 @@ cmd_sync() {
     hash_store "$project"
     sync_state_save "$project" 2>/dev/null || true
     info "hash stored"
+
+    # Brief camp context after sync
+    local sync_mission
+    sync_mission="$(field_value "$project/handoff.md" "task" 2>/dev/null || echo "")"
+    [[ -z "$sync_mission" ]] || printf "  mission: %s\n" "$sync_mission"
+
+    # Register in history so 'campsite go' works from first sync
+    local sync_adapter_name="${specific_adapter:-unknown}"
+    local sync_device
+    sync_device="$(detect_device 2>/dev/null || echo "unknown")"
+    history_append "$project" "$sync_adapter_name" "$sync_device" "$(now_iso)" "0" "sync"
 }
 
 _checkpoint_commit_message() {
@@ -346,7 +360,20 @@ cmd_save() {
 
     # Store current hash
     hash_store "$project"
-    info "save complete: $(basename "$project")"
+    printf '\n'
+    printf '  \033[32m◎\033[0m  좋아요! 다음에 돌아오면 바로 시작할 수 있어요.\n'
+
+    # Brief camp state after save
+    local next_val=""
+    while IFS=$'\t' read -r label value; do
+        case "$label" in
+            NEXT) next_val="$value" ;;
+        esac
+    done < <(camp_overview_lines "$project" 2>/dev/null)
+    if [[ -n "$next_val" ]]; then
+        printf '     next-move: %s\n' "$next_val"
+    fi
+    printf '\n'
 
     if [[ "$do_push" == "1" ]]; then
         _save_git_checkpoint_push "$project"
@@ -375,15 +402,31 @@ cmd_status() {
     local freshness_label
     freshness_label="$(freshness_label_for_file "$project/status.md")"
 
+    local task
+    task="$(field_value "$project/handoff.md" "task" 2>/dev/null || echo "?")"
+
     printf '\n'
     printf "  ${_C_BOLD:-}%s${_C_RESET:-}\n" "$name"
-    printf "  mission:      %s\n" "$(field_value "$project/handoff.md" "task" 2>/dev/null || echo "?")"
-    printf "  phase:        %s\n" "$phase"
-    printf "  confidence:   %s\n" "$confidence"
-    printf "  last-updated: %s\n" "$last_updated"
-    printf "  last-agent:   %s\n" "$last_agent"
-    printf "  last-device:  %s\n" "$last_device"
-    printf "  freshness:    %s (%s)\n" "$freshness_level" "$freshness_label"
+    printf "  mission:          %s\n" "$task"
+    printf '\n'
+
+    # Camp state — information hierarchy: alive → needs-me → next
+    while IFS=$'\t' read -r label value; do
+        case "$label" in
+            ACTIVE)  printf "  working-now:      %s\n" "$value" ;;
+            WAITING) printf "  waiting-on-you:   %s\n" "$value" ;;
+            NEXT)    printf "  next-move:        %s\n" "$value" ;;
+        esac
+    done < <(camp_overview_lines "$project")
+    printf '\n'
+
+    # Operational metadata
+    printf "  phase:            %s\n" "$phase"
+    printf "  confidence:       %s\n" "$confidence"
+    printf "  freshness:        %s (%s)\n" "$freshness_level" "$freshness_label"
+    printf "  last-updated:     %s\n" "$last_updated"
+    printf "  last-agent:       %s\n" "$last_agent"
+    printf "  last-device:      %s\n" "$last_device"
 
     # Lock
     if lock_is_held "$project" 2>/dev/null; then
@@ -393,30 +436,19 @@ cmd_status() {
         held_by="$(field_value_plain "$lock_file" "actor" 2>/dev/null || echo "?")"
         local held_tool
         held_tool="$(field_value_plain "$lock_file" "tool" 2>/dev/null || echo "?")"
-        printf "  lock:         ${_C_RED:-}locked${_C_RESET:-} by %s (%s)\n" "$held_by" "$held_tool"
+        printf "  lock:             ${_C_RED:-}locked${_C_RESET:-} by %s (%s)\n" "$held_by" "$held_tool"
     else
-        printf "  lock:         ${_C_GREEN:-}unlocked${_C_RESET:-}\n"
+        printf "  lock:             ${_C_GREEN:-}unlocked${_C_RESET:-}\n"
     fi
 
     # Hash
     local hash_rc=0
     hash_compare "$project" 2>/dev/null || hash_rc=$?
     case $hash_rc in
-        0) printf "  integrity:    ${_C_GREEN:-}clean${_C_RESET:-}\n" ;;
-        1) printf "  integrity:    ${_C_YELLOW:-}changed${_C_RESET:-} (source files modified since last sync)\n" ;;
-        2) printf "  integrity:    ${_C_DIM:-}no baseline${_C_RESET:-} (run campsite sync)\n" ;;
+        0) printf "  integrity:        ${_C_GREEN:-}clean${_C_RESET:-}\n" ;;
+        1) printf "  integrity:        ${_C_YELLOW:-}changed${_C_RESET:-} (modified since last sync)\n" ;;
+        2) printf "  integrity:        ${_C_DIM:-}no baseline${_C_RESET:-} (run campsite sync)\n" ;;
     esac
-
-    # Next task
-    local task
-    task="$(field_value "$project/handoff.md" "task" 2>/dev/null || echo "?")"
-    printf "  next-move:    %s\n" "$task"
-    while IFS=$'\t' read -r label value; do
-        case "$label" in
-            ACTIVE) printf "  working-now:  %s\n" "$value" ;;
-            WAITING) printf "  waiting-on-you: %s\n" "$value" ;;
-        esac
-    done < <(camp_overview_lines "$project")
     printf '\n'
 }
 
@@ -448,9 +480,12 @@ _validate_project() {
     [[ -n "$phase" ]] || fail "missing status phase"
     
     local valid_phases="${CAMPSITE_VALID_PHASES:-discovery building testing reviewing blocked deployed}"
-    if [[ ! " $valid_phases " =~ [[:space:]]${phase}[[:space:]] ]]; then
-        fail "invalid phase: $phase" "Valid: $valid_phases"
-    fi
+    local phase_valid=0
+    local p
+    for p in $valid_phases; do
+        [[ "$p" == "$phase" ]] && { phase_valid=1; break; }
+    done
+    [[ $phase_valid -eq 1 ]] || fail "invalid phase: $phase" "Valid: $valid_phases"
 
     # Task validation
     local task
@@ -462,8 +497,12 @@ _validate_project() {
         local status_freshness handoff_freshness
         status_freshness="$(freshness_level_for_file "$project/status.md")"
         handoff_freshness="$(freshness_level_for_file "$project/handoff.md")"
-        [[ "$status_freshness" == "stale" ]] && warn "status.md is $(freshness_label_for_file "$project/status.md")"
-        [[ "$handoff_freshness" == "stale" ]] && warn "handoff.md is $(freshness_label_for_file "$project/handoff.md")"
+        if [[ "$status_freshness" == "stale" ]]; then
+            warn "status.md is $(freshness_label_for_file "$project/status.md")"
+        fi
+        if [[ "$handoff_freshness" == "stale" ]]; then
+            warn "handoff.md is $(freshness_label_for_file "$project/handoff.md")"
+        fi
     fi
 }
 
@@ -593,6 +632,46 @@ cmd_dashboard() {
     printf '\n'
 }
 
+_camp_write_json() {
+    local project_root="$1" output="$2"
+    local working_now="" waiting_on_you="" next_move="" participant_count
+    participant_count="$(camp_participant_count "$project_root")"
+    while IFS=$'\t' read -r label value; do
+        case "$label" in
+            ACTIVE) working_now="$value" ;;
+            WAITING) waiting_on_you="$value" ;;
+            NEXT) next_move="$value" ;;
+        esac
+    done < <(camp_overview_lines "$project_root")
+    local mission
+    mission="$(camp_field_get "$(camp_mission_path "$project_root")" "title")"
+    local participants_file
+    participants_file="$(camp_participants_path "$project_root")"
+    local pjson=""
+    if [[ -f "$participants_file" ]]; then
+        pjson="$(awk -F'\t' '
+            function esc(s) { gsub(/\\/, "\\\\", s); gsub(/"/, "\\\"", s); gsub(/\n/, " ", s); return s }
+            NR == 1 { next }
+            {
+                if (NR > 2) printf ","
+                printf "{\"name\":\"%s\",\"state\":\"%s\",\"summary\":\"%s\",\"blocker\":\"%s\",\"next\":\"%s\",\"tool\":\"%s\",\"terminal\":\"%s\"}",
+                    esc($2), esc($6), esc($7), esc($8), esc($9), esc($4), esc($5)
+            }
+        ' "$participants_file")"
+    fi
+    cat > "$output" <<JSONEOF
+{
+  "mission": "$(printf '%s' "$mission" | sed 's/"/\\"/g')",
+  "working_now": "$(printf '%s' "$working_now" | sed 's/"/\\"/g')",
+  "waiting_on_you": "$(printf '%s' "$waiting_on_you" | sed 's/"/\\"/g')",
+  "next_move": "$(printf '%s' "$next_move" | sed 's/"/\\"/g')",
+  "participant_count": "$participant_count",
+  "participants": [${pjson}],
+  "updated_at": "$(now_iso)"
+}
+JSONEOF
+}
+
 # --- campsite camp ---
 cmd_camp() {
     local project
@@ -635,12 +714,83 @@ cmd_camp() {
                 printf '%s\n' "$html_path"
             fi
             ;;
+        serve)
+            local port="${CAMPSITE_SERVE_PORT:-8470}"
+            for arg in "$@"; do
+                case "$arg" in
+                    --port=*) port="${arg#--port=}" ;;
+                    *) fail "unknown flag for campsite camp serve: $arg" "Valid flags: --port=N" ;;
+                esac
+            done
+
+            # Render initial HTML
+            camp_render "$project" >/dev/null
+
+            local camp_dir
+            camp_dir="$(camp_dir "$project")"
+
+            # Copy exported design assets if available
+            if camp_assets_install "$project" 2>/dev/null; then
+                info "design assets installed to $camp_dir/assets/"
+            fi
+
+            # Generate camp-state.json for live polling
+            _camp_write_json "$project" "$camp_dir/camp-state.json"
+
+            # Inject live-reload script into rendered HTML
+            local html_path
+            html_path="$(camp_index_path "$project")"
+            if ! grep -q 'camp-live-poll' "$html_path" 2>/dev/null; then
+                _portable_sed_i 's|</body>|<script id="camp-live-poll">setInterval(async()=>{try{const r=await fetch("camp-state.json?t="+Date.now());if(!r.ok)return;const d=await r.json();document.getElementById("working-now").textContent=d.working_now;document.getElementById("waiting-on-you").textContent=d.waiting_on_you;document.getElementById("next-move").textContent=d.next_move;document.getElementById("camp-footer").textContent=d.participant_count+" participants in camp";if(d.participants){const sl={bulssi:"불씨",modakbul:"모닥불",deungbul:"등불",yeongi:"연기",jangjak:"장작"};const l=document.getElementById("participant-list");l.innerHTML="";d.participants.forEach(p=>{const e=document.createElement("div");e.className="participant";e.setAttribute("data-state",p.state);const lb=sl[p.state]||p.state;const ic=\x27<svg width="12" height="12"><use href="#ico-\x27+p.state+\x27"/></svg>\x27;let dt=\x27<span class="detail-label">Summary</span>\x27+esc(p.summary);if(p.blocker)dt+=\x27<span class="detail-label">Blocker</span><span class="detail-blocker">\x27+esc(p.blocker)+\x27</span>\x27;if(p.next)dt+=\x27<span class="detail-label">Next action</span><span class="detail-next">\x27+esc(p.next)+\x27</span>\x27;dt+=\x27<span class="detail-label">Resume</span><span class="detail-resume">\x27+esc(p.tool)+" in "+esc(p.terminal)+\x27</span>\x27;e.innerHTML=\x27<div class="participant-header"><span class="participant-name">\x27+esc(p.name)+\x27</span><span class="state-chip state-\x27+p.state+\x27">\x27+ic+lb+\x27</span></div><div class="participant-detail">\x27+dt+\x27</div>\x27;e.onclick=()=>{const dd=e.querySelector(".participant-detail");dd.style.display=dd.style.display==="block"?"none":"block"};l.appendChild(e)})}}catch(e){}},3000)</script></body>|' "$html_path"
+            fi
+
+            info "camp serving at http://localhost:${port}"
+            printf "  camp dir: %s\n" "$camp_dir"
+            printf "  press ctrl-c to stop\n\n"
+
+            # Open browser
+            camp_open_browser "http://localhost:${port}" 2>/dev/null || true
+
+            # Watch for state changes and regenerate
+            (
+                while true; do
+                    sleep 3
+                    _camp_write_json "$project" "$camp_dir/camp-state.json" 2>/dev/null || true
+                done
+            ) &
+            local watch_pid=$!
+            trap "kill $watch_pid 2>/dev/null; exit 0" INT TERM
+
+            # Serve via python
+            if command -v python3 >/dev/null 2>&1; then
+                python3 -m http.server "$port" --directory "$camp_dir" 2>/dev/null
+            elif command -v python >/dev/null 2>&1; then
+                cd "$camp_dir" && python -m SimpleHTTPServer "$port" 2>/dev/null
+            else
+                kill $watch_pid 2>/dev/null || true
+                fail "python not found — needed for camp serve" "Install python3 or open the HTML directly: $html_path"
+            fi
+            ;;
         overview)
             camp_overview_print "$project"
             ;;
         mission)
             local action="${1:-}"
             shift || true
+            # Interactive mission input when no args
+            if [[ -z "$action" ]] && [[ -t 0 ]]; then
+                printf '\n  \033[33m◎\033[0m  지금 뭘 만들고 있나요?\n'
+                printf '     \033[2m미션을 한 문장으로 적어보세요.\033[0m\n\n'
+                printf '  > '
+                local input_title=""
+                read -r input_title
+                if [[ -n "$input_title" ]]; then
+                    camp_set_mission "$project" "$input_title" "" "" ""
+                    info "camp mission updated"
+                    printf '     \033[2m좋아요! 캠프파이어에 불이 붙었어요.\033[0m\n\n'
+                fi
+                return 0
+            fi
             [[ "$action" == "set" ]] || fail "usage: campsite camp mission set <title> [--summary=...] [--state=...] [--next-action=...]"
 
             local title="${1:-}"
@@ -725,7 +875,7 @@ cmd_camp() {
             esac
             ;;
         "")
-            fail "usage: campsite camp <render|overview|mission|participant> ..."
+            fail "usage: campsite camp <render|serve|overview|mission|participant> ..."
             ;;
         *)
             # Backward-compatible flag-only usage maps to render.
@@ -736,7 +886,7 @@ cmd_camp() {
                 case "$arg" in
                     --no-open) no_open=1 ;;
                     --print-path) print_path=1 ;;
-                    *) fail "unknown camp command: $subcommand" "Valid commands: render, overview, mission, participant" ;;
+                    *) fail "unknown camp command: $subcommand" "Valid commands: render, serve, overview, mission, participant" ;;
                 esac
             done
 
@@ -1042,9 +1192,9 @@ cmd_peek() {
         if [[ -f "$(camp_participants_path "$project")" ]]; then
             while IFS=$'\t' read -r label value; do
                 case "$label" in
-                    ACTIVE) printf "  camp-now:  %s\n" "$value" ;;
-                    WAITING) printf "  camp-wait: %s\n" "$value" ;;
-                    NEXT) printf "  camp-next: %s\n" "$value" ;;
+                    ACTIVE) printf "  working-now:      %s\n" "$value" ;;
+                    WAITING) printf "  waiting-on-you:   %s\n" "$value" ;;
+                    NEXT) printf "  next-move:        %s\n" "$value" ;;
                 esac
             done < <(camp_overview_lines "$project")
             printf '\n'
@@ -1165,9 +1315,14 @@ _deprecated() {
 main() {
     case "${1:-}" in
         "")
-            # First-run detection
+            # First-run detection — friendly welcome
             if [[ ! -f "$(campsite_global_dir)/setup-complete" ]]; then
-                warn "first time? Run 'campsite setup' to configure your workspace."
+                printf '\n'
+                printf '  \033[33m◎\033[0m  처음이시네요! 캠프를 만들어볼까요?\n'
+                printf '     \033[2m어렵지 않아요. 1분이면 됩니다.\033[0m\n'
+                printf '\n'
+                cmd_setup "$@"
+                return $?
             fi
             cmd_launcher
             ;;

@@ -155,9 +155,9 @@ campsite() {
 check_dependencies() {
     local missing=()
 
-    # Bash version (need 4+ for associative arrays)
-    if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
-        missing+=("bash 4+ (current: $BASH_VERSION)")
+    # Bash version — indexed arrays and [[ ]] work on 3.2+, no associative arrays used
+    if [[ "${BASH_VERSINFO[0]}" -lt 3 ]]; then
+        missing+=("bash 3.2+ (current: $BASH_VERSION)")
     fi
 
     # Required tools

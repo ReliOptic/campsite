@@ -73,7 +73,10 @@ history_mru_projects() {
     [[ -f "$hfile" ]] || return 1
 
     # Skip CSV header, reverse, deduplicate keeping first (most recent), limit
-    tail -n +2 "$hfile" | tac 2>/dev/null | awk -F',' '!seen[$1]++ {print $1","$4}' | head -"$count"
+    # Use tail -r on macOS (no tac), fall back to awk reverse
+    tail -n +2 "$hfile" | \
+        { tac 2>/dev/null || tail -r 2>/dev/null || awk '{a[NR]=$0} END{for(i=NR;i>=1;i--)print a[i]}'; } | \
+        awk -F',' '!seen[$1]++ {print $1","$4}' | head -"$count"
 }
 
 # Resolve a project name back to its absolute path via workspace scan

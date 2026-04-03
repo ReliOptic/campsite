@@ -47,6 +47,9 @@ jobs:
       - name: Run smoke test
         run: make test-smoke
 
+      - name: Run hybrid smoke test
+        run: make test-hybrid
+
       - name: Run unit tests
         run: make test-unit
 

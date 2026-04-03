@@ -1,411 +1,284 @@
-# Campsite Spec-Driven PRD: Recovery-First Vibe Camp
+# Campsite PRD: Multi-Project Recovery Hub
 
 > Owner: Kiwon Cho
-> Status: Draft
-> Last updated: 2026-04-03
-> Based on: `docs/office-hours-vibe-camp-design.md`
-> Foundation boundary: `docs/libghostty-foundation-boundary.md`
+> Status: v2 Draft
+> Last updated: 2026-04-04
 
-## 1. Product Summary
+## 1. 한 문장 정의
 
-Campsite is evolving from a session context compiler into a recovery-first local work space for solo vibe coders.
+Campsite는 여러 프로젝트와 AI agent를 하나의 캠프 공간에 모아서, 떠났다 돌아왔을 때 3초 안에 모든 상황을 파악하고 다시 시작할 수 있게 해주는 recovery hub입니다.
 
-The first product is not a generic multi-agent orchestrator. It is a terminal-first camp where local agents and terminal tasks "enter the camp," leave behind visible state, and let the human return later and understand the whole situation in about five seconds.
+## 2. 누구를 위한 제품인가
 
-The web scene is the visible camp. The terminal remains the working edge.
+### Primary Persona: 민지 (30대, 프론트엔드 개발자)
 
-## 2. Problem Statement
+- 회사에서 3개 프로젝트를 동시에 진행
+- 바이브코딩이 뭔지 동료에게 들었지만 직접 해본 적 없음
+- 코딩 자체를 사랑하진 않지만, 잘 만드는 건 좋아함
+- 터미널이 무섭고, AI 도구가 너무 많아서 어디서 시작해야 할지 모름
+- 퇴근 후 30분 사이드 프로젝트를 하고 싶지만, 매번 "어디까지 했더라"에서 10분을 낭비
 
-Solo builders using Claude Code, Codex, Gemini, Ghostty, and other local tools lose momentum when they context-switch away and return later.
+### 민지가 원하는 것
 
-The painful moment is not "I cannot run enough agents." The painful moment is:
+- "어렵지 않아, 복잡하지 않아, 쉬운 거야"
+- 열었을 때 예쁘고 차분한 화면
+- 뭘 해야 하는지 바로 보이는 것
+- 스트레스 없이 생산적인 느낌
 
-- I do not know who is still working.
-- I do not know what finished.
-- I do not know what changed.
-- I do not know what I should do next.
+### Anti-Persona
 
-That recovery friction:
+- 터미널 최적화에 집착하는 power user → OMC가 더 적합
+- 100개 agent를 동시에 돌리고 싶은 orchestration builder → 다른 도구
 
-- lowers vibe-coding retention
-- increases restart time after interruption
-- pushes focused work later into the night
-- makes multi-agent work feel messy even when output is technically progressing
+## 3. 문제
 
-## 3. Product Thesis
+AI 코딩 도구는 강력하지만 기억상실증이 있습니다.
 
-The first great Campsite experience is not more automation. It is better re-entry.
+빠르게 생성하는 건 어렵지 않습니다. 어려운 건:
 
-If Campsite can make a user step away, come back, and immediately regain working context, then it creates:
+- 어제 뭘 하고 있었는지 기억하는 것
+- 3개 프로젝트 중 어디에 먼저 손을 대야 하는지 판단하는 것
+- AI가 만든 걸 검토해야 하는지, 계속 두면 되는지 아는 것
+- 중단했다 돌아왔을 때 겁먹지 않는 것
 
-- higher retention for long-running creative/engineering sessions
-- lower handoff friction between human and agent
-- more trust in running multiple agents at once
-- a stronger emotional loop than plain dashboards or logs
+이 문제는 메모리가 아니라 **복귀(recovery)**의 문제입니다.
 
-This requires:
+## 4. 3가지 약속
 
-- a spatial metaphor instead of a plain control panel
-- a state model based on work phase and human intervention timing
-- bounded automation, where agents leave behind useful state instead of silently creating more work
+### 4.1 발상 (Ideation)
 
-## 4. Goals
+캠프는 AI에게 일을 시키기 전에 **의도를 선명하게 만드는 공간**입니다.
 
-- G1: A returning user can understand camp state in 5 seconds or less.
-- G2: The first screen answers three questions at a glance:
-- who is active
-- what reached a human review point
-- what the next human action is
-- G3: Campsite feels playful and alive without hiding critical state.
-- G4: Solo vibe coders can manage multiple local agents without feeling scattered.
-- G5: Campsite remains terminal-first and local-first.
-- G6: Agent completion defaults to state capture, not uncontrolled follow-on execution.
+구현:
+- 캠프를 열면 mission board가 보임 — "지금 뭘 만들고 있는지"
+- mission을 정하는 행위가 첫 번째 interaction
+- 여러 프로젝트의 mission이 한 공간에 정렬됨
 
-## 5. Non-Goals
+### 4.2 검토 (Review)
 
-- Full multiplayer team world in v1
-- Hosted orchestration backend
-- Autonomous agent swarm that continuously self-assigns tasks
-- Replacing agent CLIs with a proprietary runtime
-- Deep IDE integration as a launch requirement
-- Turning Campsite into a generic observability console
+캠프는 AI가 만든 것을 **사람이 판단하는 중심**입니다.
 
-## 6. Primary User
+구현:
+- 등불(deungbul) 상태 = "너한테 물어볼 게 있어"
+- 연기(yeongi) 상태 = "도와줘야 해"
+- review가 필요한 항목이 시각적으로 가장 먼저 보임
 
-### Primary Wedge
+### 4.3 체력 (Stamina)
 
-A solo vibe coder who:
+캠프는 **오래 일할 수 있는 리듬**을 만들어줍니다.
 
-- uses multiple local AI coding tools and terminals
-- frequently context-switches between projects or responsibilities
-- comes back to partially completed work and loses time rebuilding mental context
-- wants work to feel alive and coherent, not like scattered logs
+구현:
+- 프로젝트 간 전환이 2초
+- 복귀 시 "어디까지 했더라"가 3초
+- save 할 때 "잘했어, 다음에 바로 시작할 수 있어" 피드백
+- 캠프 자체가 명상적이고 차분한 시각 경험
 
-### Secondary User
+## 5. 제품 구조
 
-Hackathon participants and small teams who may later adopt the same camp metaphor, but only after the solo recovery loop is strong.
+### 5.1 Campsite는 Multi-Project Hub
 
-## 7. Jobs To Be Done
+```
+[프로젝트 A: 회사 대시보드]  ─┐
+[프로젝트 B: 사이드 앱]      ├─→  Campsite (캠프 공간)
+[프로젝트 C: 블로그]         ─┘
+```
 
-When I come back after being away, I want to know what is going on in seconds so I can continue without reconstructing everything from memory.
+캠프에 들어오는 단위 = 프로젝트. 프로젝트들이 모여서 시너지를 교류하고, 그 과정이 시각화됩니다.
 
-When I let an agent keep working, I want to trust that it will leave behind a useful state, not a bigger mess.
+### 5.2 PARA 구조
 
-When I open Campsite, I want the environment to feel motivating and legible, not like another enterprise dashboard.
+캠프 안에는:
 
-When an agent reaches a meaningful stopping point, I want Campsite to show me whether I need to review, decide, unblock, or continue.
+- **Projects**: 현재 활성 프로젝트들 (fire-state로 시각화)
+- **Areas**: 반복적 책임 영역 (유지보수, 인프라, 학습)
+- **Resources**: 참조 자료, 템플릿, 유용한 링크
+- **Archive**: 완료된 프로젝트의 기록 — 캠프의 추억
 
-## 8. Product Principles
+### 5.3 두 개의 표면
 
-### 8.1 Recovery First
+- **Camp mode**: 브라우저에서 열리는 시각적 공간. 복귀, 파악, 감정적 안정.
+- **Focus mode**: 터미널에서의 실행. 빠르고 날카로운 작업.
 
-Every feature must improve the return-to-work loop before it improves concurrency, orchestration power, or visual complexity.
+둘은 같은 세계입니다. 고도(altitude)만 다릅니다.
 
-### 8.2 State Over Spectacle
+## 6. OMC 공존 모델
+
+### Campsite ≠ OMC
+
+| | OMC | Campsite |
+|---|---|---|
+| 역할 | 실행력 harness | 공간 경험 |
+| 범위 | 세션 내 (in-session) | 세션 간 (across-session) |
+| 핵심 | agent orchestration, parallel execution | recovery, gamification, 시각화 |
+| 설치 | Claude Code plugin | 독립 CLI |
+
+### 공존 방식
+
+```
+tmux Terminal A: Claude + OMC  ──┐
+tmux Terminal B: Codex          ├──→ Campsite camp
+tmux Terminal C: Gemini         ──┘
+```
+
+- OMC가 잘하는 것(orchestration, agent routing, ultrawork)은 OMC에 위임
+- Campsite는 그 결과물이 모이는 공간
+- CLAUDE.md/AGENTS.md 오염 없음 — coordination은 `.campsite/` 안에서만
+- Campsite는 OMC가 없어도 동작하고, OMC는 Campsite가 없어도 동작함
+
+## 7. 첫 5분 시나리오: "민지의 첫 캠프"
+
+```
+0:00  curl install → campsite 설치
+0:30  campsite 입력 → "처음이시네요! 캠프를 만들어볼까요?"
+1:00  프로젝트 경로 선택 → 자동으로 프로젝트 생성
+1:30  campsite camp → 브라우저에 캠프가 열림
+      빈 캠프파이어. "조용한 밤. 첫 미션을 정해보세요."
+2:00  미션 입력: "로그인 페이지 만들기"
+      캠프파이어에 불이 붙음
+2:30  campsite → agent 선택 → Claude 시작
+      캠프에 participant 등장 (모닥불 상태)
+3:30  작업 중... 캠프가 실시간으로 바뀜
+4:00  campsite save → 세션 종료
+      "좋아요! 다음에 돌아오면 바로 시작할 수 있어요."
+      캠프: 장작 상태로 전환
+4:30  campsite camp → 다시 열기
+      "마지막으로 여기 있었어요: 30초 전"
+      "다음 할 일: 로그인 API 연결"
+5:00  가치 체감 완료
+```
+
+핵심: **첫 5분 안에 "돌아왔을 때 바로 알 수 있다"를 체감**해야 합니다.
 
-Pixel art and camp metaphors are good only if they make task state easier to read.
-
-### 8.3 Human Re-Entry Is The Core Loop
-
-The core product action is not launching an agent. It is a human re-entering the camp and resuming useful work.
-
-### 8.4 Bounded Autonomy
-
-Agents may keep working. But the default automation target is summary and state capture, not self-propagating task creation.
-
-### 8.5 Terminal Is Still Home
-
-Users should be able to enter Campsite from a terminal workflow and still feel that the terminal is the real working surface.
-
-## 9. Core User Experience
-
-### 9.1 Hero Moment
-
-The user has been away for hours. They reopen Campsite. In under five seconds they can tell:
-
-- which agent is still actively working
-- which work item is waiting for human judgment
-- what the next best human action is
-
-### 9.2 First Version Narrative
-
-1. User launches or re-enters Campsite from terminal.
-2. Local web UI opens a pixel-art camp scene.
-3. Agents and terminal tasks appear as camp participants.
-4. Each participant is represented through a visible fire-state.
-5. The center campfire represents the current mission or working thread.
-6. Returning user reads the camp, clicks into the relevant participant or campfire summary, and resumes work.
-
-### 9.3 UX Intent
-
-The desired user feeling is:
-
-- I am working in a terminal-first environment
-- when I need to zoom out, I can slip into Campsite
-- Campsite gives me room to recover, understand, and vibe
-- when I go back into execution, I do not feel like I switched products
-
-Camp mode is the spatial breathing room around the work.
-Focus mode is the sharp edge where the work gets done.
-The user should feel both as one continuous experience.
-
-## 10. Core State Model
-
-Campsite must avoid a simplistic "done/not done" model.
-
-Instead, work is represented by fire-state phases:
-
-- `불씨` (`bulssi`)
-  Newly started work. It exists, but it is still weak and should be watched.
-- `모닥불` (`modakbul`)
-  Active, focused work in progress.
-- `등불` (`deungbul`)
-  A meaningful segment is complete and waiting on human review or judgment.
-- `연기` (`yeongi`)
-  Work is blocked or needs help.
-- `장작` (`jangjak`)
-  The next meaningful action is prepared and ready to be picked up.
-
-### 10.1 State Semantics
-
-- `불씨` is not idle. It means the task just started or only has low-confidence progress.
-- `모닥불` means the system believes work is actively progressing.
-- `등불` means "come read this," not "the mission is over."
-- `연기` means the human is needed now.
-- `장작` means there is a prepared next step, but Campsite should not assume it should run automatically.
-
-### 10.2 State Transition Rules
-
-- New agent/task entry defaults to `불씨`.
-- Confirmed active execution transitions to `모닥불`.
-- Completion of a bounded segment transitions to `등불`.
-- Detected blocker or explicit request for human input transitions to `연기`.
-- Generated next-step recommendation transitions to `장작`.
-- A human may promote `장작` back to `불씨` by explicitly starting that next action.
-
-## 11. Functional Requirements
-
-### 11.1 Session Entry
-
-- FR1: User can enter Campsite from terminal via a single command.
-- FR2: Entering Campsite opens or attaches to a local web scene.
-- FR3: Campsite can register local agent sessions and terminal tasks as camp participants.
-
-### 11.2 Recovery Screen
-
-- FR4: The main camp scene must surface active participants, review-ready participants, and next actions without requiring navigation.
-- FR5: The user must be able to identify the three key signals in one screen:
-- who is active
-- what needs review
-- what to do next
-- FR6: The center mission or campfire must summarize the current working thread.
-
-### 11.3 State Capture
-
-- FR7: When a participant changes phase, Campsite stores the new fire-state.
-- FR8: On segment completion, Campsite should prompt or infer a short result summary.
-- FR9: On blocker detection, Campsite must capture why the task is blocked.
-- FR10: On ready-for-review transitions, Campsite must preserve enough context for the human to decide quickly.
-- FR11: Campsite should support a prepared next action without automatically running it by default.
-
-### 11.4 Bounded Automation
-
-- FR12: Campsite may support explicit post-task policies such as "run tests after this finishes."
-- FR13: Campsite must not default to open-ended self-assigned follow-up work.
-- FR14: Automatic follow-on behavior must be visible and user-authored.
-
-### 11.5 UX and Visual Layer
-
-- FR15: The visual layer must use camp/fire metaphors to encode real state.
-- FR16: Visual polish must not hide whether a task is active, blocked, review-ready, or staged.
-- FR17: Pixel-art scenes must remain legible on laptop-sized screens.
-
-### 11.6 Local-First Operation
-
-- FR18: v1 must work without a hosted backend.
-- FR19: Camp state must be stored locally.
-- FR20: Campsite must preserve a useful terminal-only fallback path if the web scene fails.
-
-## 12. Non-Functional Requirements
-
-- NFR1: Camp state should load fast enough that the main scene appears effectively instantly on local machines.
-- NFR2: The primary camp scene should be readable within 5 seconds by a returning user with no extra training.
-- NFR3: The system should degrade gracefully when a participant exits unexpectedly.
-- NFR4: The visual layer should feel expressive but remain lightweight enough for a local-first CLI tool.
-- NFR5: The state model should be stable enough that users learn the metaphor after a few sessions.
-
-## 12.1 Foundation Boundary
-
-If Campsite adopts a stronger terminal foundation such as `libghostty`, that layer must remain a foundation, not a product identity.
-
-The boundary is:
-
-- terminal rendering and embedding may be delegated downward
-- mission language, fire-state semantics, recovery UX, tranquil autonomy, and family look stay owned by Campsite
-
-See:
-
-- `docs/libghostty-foundation-boundary.md`
-- `docs/family-look-spec.md`
-
-## 13. UX Spec
-
-### 13.1 Information Hierarchy
-
-The initial scene must prioritize:
-
-1. active work
-2. human-needed work
-3. next action
-
-Everything else is secondary.
-
-### 13.2 Main Scene Objects
-
-- `Campfire`
-  Represents the current mission or main thread.
-- `Participants`
-  Agents, terminals, or tasks that have entered the camp.
-- `State aura`
-  Fire-state visualization around each participant.
-- `Return panel`
-  A compact summary that restates the three key signals in plain language.
-
-### 13.3 Interaction Model
-
-- Clicking a participant opens its recent summary, current state, and next action.
-- Clicking the campfire opens the mission summary and work thread context.
-- Review-ready participants should be visually louder than idle or newly started ones.
-- Blocked participants should be unmistakable without being alarming noise all the time.
-
-## 14. Command and System Spec
-
-The exact command names can change, but the system needs these capabilities:
-
-- launch or attach to local camp UI
-- register a participant entering the camp
-- update participant state
-- record a summary on phase transition
-- surface current camp overview
-- restore last known camp state after interruption
-
-Representative command surface:
-
-- `campsite camp`
-- `campsite enter --participant <id> --type <agent|terminal|task>`
-- `campsite update --participant <id> --state <bulssi|modakbul|deungbul|yeongi|jangjak>`
-- `campsite overview`
-- `campsite resume`
-
-## 15. Success Metrics
-
-### 15.1 Product Metrics
-
-- Median time-to-orient after return
-- Number of successful same-day return sessions
-- Percentage of return sessions that proceed to action within 30 seconds
-- Number of tasks reaching `등불` or `장작` with usable summaries
-
-### 15.2 Experience Metrics
-
-- User-reported feeling of "I know what is going on"
-- User-reported reduction in restart friction
-- Demo reaction quality: "I want to use this" versus "nice concept"
-
-## 16. Risks
-
-### 16.1 Cute But Useless
-
-Risk:
-The camp metaphor becomes decorative and stops helping actual work.
-
-Mitigation:
-Every visual element must map to a real product question or action.
-
-### 16.2 Too Much Automation
-
-Risk:
-Agents continue doing work that burns tokens, drifts scope, or creates false confidence.
-
-Mitigation:
-Default to state capture and explicit user-authored automation policies only.
-
-### 16.3 State Ambiguity
-
-Risk:
-Users cannot tell the difference between "done for now," "blocked," and "ready for review."
-
-Mitigation:
-Keep state count low and semantics strict.
-
-### 16.4 Premature Team Scope
-
-Risk:
-The product expands into multiplayer before the solo loop works.
-
-Mitigation:
-Treat solo re-entry as the gating success condition for future expansion.
-
-## 17. Rollout Plan
-
-### Phase 1: Solo Recovery Loop
-
-- launch local camp scene
-- register participants
-- display fire-states
-- support camp overview and resume flow
-
-### Phase 2: State Capture Depth
-
-- summaries on state transitions
-- review-ready details
-- blocker capture
-- prepared next action capture
-
-### Phase 3: Bounded Automation
-
-- explicit post-task policies
-- safe chained actions
-- visibility into policy-triggered follow-up work
-
-### Phase 4: Team and Hackathon Extensions
-
-- shared viewing
-- camp visiting
-- team handoff metaphors
-
-## 18. Open Questions
-
-- What is the right default mapping from raw process signals to fire-states?
-- Should the campfire represent a single mission or allow multiple concurrent fires?
-- How much summary text is enough before it turns into clutter?
-- What is the smallest useful visual prototype that proves the recovery loop?
-- What should happen when an agent disappears without a clean exit?
-- How should the future team mode work when multiple people gather in the same Campsite, talk, and hand off branches or mission threads to each other?
-
-## 19. Spec Acceptance Criteria
-
-This PRD is successful if the first implementation can demonstrate all of the following:
-
-- A user starts more than one local participant and sees them represented in one camp.
-- A user leaves and returns later.
-- On return, the user can correctly identify active work, review-ready work, and next action in under 5 seconds.
-- At least one participant can transition into `등불` with a readable summary.
-- At least one participant can transition into `연기` with a visible blocker reason.
-- At least one participant can transition into `장작` with a prepared next action.
-- The product feels more like a place than a dashboard, while still being operationally clear.
-
-## 20. Relationship To Existing Campsite PRD
-
-`Campsite-prd-v2.md` remains the harness and protocol contract for the existing compiler product.
-
-This document defines the next product layer:
-
-- how Campsite should feel
-- what new user problem it should solve
-- what experience and state model should guide implementation
-
-The two documents are complementary:
-
-- `Campsite-prd-v2.md` explains the current harness foundation
-- `docs/spec-driven-prd-vibe-camp.md` explains the next recovery-first product direction
+## 8. Fire-State 모델
+
+| 상태 | 의미 | 감정 | 시각 |
+|------|------|------|------|
+| 불씨 (bulssi) | 막 시작됨, 아직 약함 | 조심스러운 시작 | 작은 불꽃 |
+| 모닥불 (modakbul) | 활발하게 진행 중 | 집중, 에너지 | 타오르는 불 |
+| 등불 (deungbul) | 사람의 검토 필요 | 기다림, 안정 | 따뜻한 등 |
+| 연기 (yeongi) | 막혀있음, 도움 필요 | 긴장, 주의 | 연기 신호 |
+| 장작 (jangjak) | 다음 할 일 준비됨 | 준비, 기대 | 쌓인 나무 |
+
+### 전환 규칙
+
+- 새 진입 → 불씨
+- 실행 확인 → 모닥불
+- 구간 완료 → 등불
+- 차단 감지 → 연기
+- 다음 행동 생성 → 장작
+- 사람이 장작을 태움 → 불씨로 순환
+
+## 9. 제품 성격
+
+### 해야 하는 것
+
+- 차분하고 야간적 (nocturnal, calm)
+- 귀엽지만 유치하지 않음
+- 게이미피케이션 — 진행 느낌, 작은 성취감
+- 명상적 — 스트레스를 줄이는 시각 경험
+- 낮은 도파민, 높은 지속력
+- "30대 여성이 열었을 때 관심이 가는 생산성 도구"
+
+### 하지 않아야 하는 것
+
+- 기업용 대시보드 느낌
+- 과도한 알림이나 긴급성
+- 복잡한 설정 화면
+- 남성 개발자 중심의 터미널 미학만
+- AI slop (과도한 자동 생성 텍스트)
+
+## 10. 기능 요구사항
+
+### 10.1 첫 5분 흐름
+
+- FR1: 첫 실행 시 자동 감지 + 친절한 안내 ("처음이시네요!")
+- FR2: 프로젝트 생성이 한 번의 경로 입력으로 완료
+- FR3: 빈 캠프가 감정적으로 매력적 (초대하는 느낌)
+- FR4: 미션 입력이 대화형으로 가능
+
+### 10.2 복귀 경험
+
+- FR5: 캠프를 열면 3초 안에 세 가지 파악: 누가 활동 중 / 뭐가 나를 기다리는지 / 다음 할 일
+- FR6: "마지막으로 여기 있었어요: N분/시간/일 전" 표시
+- FR7: 프로젝트 간 전환이 2초 이내
+
+### 10.3 Multi-Project
+
+- FR8: 여러 프로젝트가 하나의 캠프 공간에 표시
+- FR9: 각 프로젝트가 독립적 fire-state를 가짐
+- FR10: 프로젝트 간 우선순위가 시각적으로 구분됨
+
+### 10.4 감정적 피드백
+
+- FR11: save 시 긍정 피드백 ("좋아요! 다음에 바로 시작할 수 있어요.")
+- FR12: 첫 participant 등장 시 작은 celebration
+- FR13: 장기간 부재 후 복귀 시 따뜻한 환영
+
+### 10.5 OMC 연동
+
+- FR14: 다른 터미널의 AI CLI 세션이 캠프에 participant로 등록 가능
+- FR15: CLAUDE.md/AGENTS.md 수정 없이 camp state만 갱신
+- FR16: OMC 없이도 모든 기능 동작
+
+## 11. 비기능 요구사항
+
+- NFR1: 캠프 화면 로드 1초 이내
+- NFR2: HTML 총량 50KB 이내 (에셋 제외)
+- NFR3: python 없이도 camp render는 동작 (serve만 python 필요)
+- NFR4: bash 3.2+ 호환
+- NFR5: 인터넷 없이 동작 (Google Fonts는 optional enhancement)
+
+## 12. 비목표
+
+- v1에서 멀티플레이어 팀 기능
+- 호스팅 백엔드
+- 자율 agent 스웜
+- IDE 통합
+- 범용 관측성 콘솔
+- OMC 기능 복제
+
+## 13. 성공 지표
+
+### 제품 지표
+
+- 복귀 후 상황 파악까지 걸리는 시간 (목표: 3초)
+- 첫 5분 내 가치 체감 여부
+- 일주일 연속 사용 유지율
+- "이거 뭐야?" → "나도 쓰고 싶어" 전환율 (데모 반응)
+
+### 경험 지표
+
+- "어렵지 않아"라는 반응
+- "예쁘다"라는 반응
+- 스트레스 감소 체감
+- 프로젝트 전환 시 불안 감소
+
+## 14. 롤아웃
+
+### Phase 1: Solo Recovery Loop (현재)
+- 설치 → 첫 5분 → 가치 체감 경로 완성
+- 단일 프로젝트 camp render + serve
+- fire-state 시각화
+- 친절한 first-run
+
+### Phase 2: Multi-Project Hub
+- 여러 프로젝트 한 캠프에 표시
+- PARA 구조 도입
+- 프로젝트 간 전환
+
+### Phase 3: Gamification + Social
+- 진행도 시각화, 연속 사용 streak
+- 다른 터미널 AI CLI 자동 감지 + 등록
+- 캠프 추억 (archive)
+
+### Phase 4: Team
+- 공유 캠프
+- 미션 공유, 브랜치 핸드오프
+
+## 15. 열린 질문
+
+- 캠프파이어가 프로젝트 1개당 1개인가, 캠프 전체에 1개인가?
+- PARA의 Area/Resource는 어떤 UI로 접근하는가?
+- 게이미피케이션의 적정 수준은? (streak? badge? level?)
+- OMC 연동의 최소 인터페이스는?
+- 민지가 실제로 "예쁘다"고 느끼려면 어떤 시각 수준이 필요한가?

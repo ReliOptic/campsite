@@ -135,7 +135,7 @@ _run_camp() {
     [[ "$status" -eq 0 ]]
     grep -q "session-claude-" "$TEST_PROJECT/.campsite/camp/participants.tsv"
     grep -q "deungbul" "$TEST_PROJECT/.campsite/camp/participants.tsv"
-    grep -q "next task updated" "$TEST_PROJECT/.campsite/camp/events.tsv"
+    grep -q "next task updated\|finished with changes" "$TEST_PROJECT/.campsite/camp/events.tsv"
 }
 
 @test "peek includes camp overview summary when camp state exists" {
@@ -161,7 +161,7 @@ _run_camp() {
     "
 
     [[ "$status" -eq 0 ]]
-    echo "$output" | grep -q "camp-now:"
-    echo "$output" | grep -q "camp-wait:"
-    echo "$output" | grep -q "camp-next:"
+    echo "$output" | grep -q "working-now:"
+    echo "$output" | grep -q "waiting-on-you:"
+    echo "$output" | grep -q "next-move:"
 }

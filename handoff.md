@@ -2,22 +2,23 @@
 
 ## Next Action
 
-- task: strengthen live participant summaries and tighten terminal-side mission copy so Focus mode and Camp mode feel more coherent
-- fallback-task: refine save --push commit staging semantics if tracked-only checkpoints feel too narrow
-- priority: high
+- task: 디자인 에셋 생성 — design/image_prompt.md 프롬프트로 첫 6종 pixel art 생성 후 design/export/에 배치
+- fallback-task: interactive launcher/setup TTY 검증, freshness → launcher confidence 반영
+- priority: medium
 - estimated-scope: medium
-- entry-point: lib/camp.sh
-- precondition: freshness helpers and save --push remain the current baseline
+- entry-point: design/image_prompt.md (프롬프트), design/export/ (결과물), lib/camp-assets.sh (파이프라인)
+- precondition: CSS/SVG fallback layer 완성, asset pipeline code 준비됨
 
 ## Context for Next Session
 
-Campsite now has product philosophy, camp state, freshness helpers, safe checkpoint push, an active hybrid testing strategy, and a truthful quiet-camp empty state. The next slice should improve the quality of the visible experience again, but now on real sessions instead of fake placeholders: make live participant summaries sharper, tighten terminal mission copy, and keep Camp mode and Focus mode emotionally aligned.
+디자인 에셋 Phase 1-3 완료: CSS night sky + stars, inline SVG sprites (campfire + 5 fire-state icons), campfire glow/flicker, corner accents, modakbul pulse, prefers-reduced-motion. Asset pipeline (lib/camp-assets.sh) 구축: install/base64/manifest. Serve JSON에 participant 배열 추가, live-poll에서 participant 목록 실시간 갱신. 다음은 실제 pixel art 이미지 생성 (campfire-core, status badges 우선) 또는 interactive launcher 검증.
 
 ## Open Questions
 
-- Should sparse camps show fewer seeded participants by default once real sessions exist?
-- Should launcher selection itself show freshness confidence more directly?
+- Should launcher selection show freshness confidence more directly?
 - Should future checkpoint push include an opt-in mode for staging new files?
+- Should camp render HTML return panel labels match terminal output exactly (Working now vs working-now)?
+- interactive launcher와 setup은 TTY 환경에서만 검증 가능 — 자동화 테스트 방법?
 
 ## Session Log
 
@@ -30,3 +31,7 @@ Campsite now has product philosophy, camp state, freshness helpers, safe checkpo
 | 2026-04-03 | codex | Added freshness helpers, Focus-mode language improvements, and `save --push` checkpoint flow | Campsite now has a stronger terminal loop and a usable checkpoint push path |
 | 2026-04-03 | codex | Added hybrid testing strategy, smoke harness, and `make test-hybrid`; fixed bare-remote branch verification in smoke flow | Campsite now has a repeatable reliability loop plus explicit human review gate |
 | 2026-04-03 | codex | Removed seeded fake participants, added a truthful quiet-camp empty state, and fixed manual participant terminal metadata handling | Sparse camps now stay calm and honest instead of over-speaking |
+| 2026-04-03 | claude | Improved session summaries with tool/terminal/mission context, aligned peek labels to family-look vocabulary, restructured status output to match camp information hierarchy | Focus mode and Camp mode now use the same language and information order |
+| 2026-04-03 | claude-opus | Fixed validate set-e/regex bug, install.sh bash 4+ false requirement, go history bootstrap + macOS tac compat, added font CDN, browser failure message, adapter zero UX, CI hybrid smoke | All non-interactive commands verified end-to-end on fresh install |
+| 2026-04-03 | claude-opus | Replaced dashboard camp render with return-first minimal view, fixed bash read empty-field bug via awk, added camp serve live-poll selector update | Camp render is now a functional return-first view |
+| 2026-04-04 | claude-opus | Built design asset layers: CSS night sky + stars, SVG sprite sheet (6 icons), campfire glow, corner accents, animations, asset pipeline (lib/camp-assets.sh), serve JSON with participants, live-poll participant refresh | Camp render has visual identity matching product vision |
