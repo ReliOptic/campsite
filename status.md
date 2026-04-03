@@ -25,6 +25,8 @@
 - Freshness helpers now exist and are surfaced in terminal-facing status flows.
 - `campsite save --push` now creates a conservative checkpoint commit and pushes it to the current branch.
 - A hybrid testing strategy now exists, with a smoke harness covering `status`, `sync`, `camp overview`, `camp render`, and `save --push`.
+- Sparse camps now stay quiet instead of inventing fake participants, and the rendered scene shows an explicit truthful empty state.
+- Manual `camp participant enter/update` now preserve terminal metadata correctly.
 - Design asset prompts and folder structure now exist for future visual production.
 - Implementation work is now tracked in `docs/implementation-tracker.md`.
 
@@ -37,5 +39,6 @@
 ## Blockers
 
 - `bats` is not available in the current environment, so new tests are being added but not executed automatically here.
-- Need better live camp summaries so default seeded participants do not over-speak when real state is sparse.
+- Need sharper live participant summaries now that sparse camp behavior is truthful.
 - Need a clear product decision on whether future checkpoint push should include new untracked files or stay tracked-only.
+- Focus mode copy still needs another pass so terminal language feels as cohesive as the camp scene.

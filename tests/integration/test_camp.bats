@@ -43,14 +43,32 @@ _run_camp() {
     grep -q "장작" "$TEST_PROJECT/.campsite/camp/index.html"
 }
 
+@test "camp overview stays quiet when no real participants exist" {
+    _run_camp overview
+
+    [[ "$status" -eq 0 ]]
+    echo "$output" | grep -q "working-now: none yet"
+    echo "$output" | grep -q "waiting-on-you: none waiting"
+    echo "$output" | grep -q "next-move: mission: implement tests"
+}
+
+@test "camp html uses truthful empty state when no real participants exist" {
+    _run_camp --print-path --no-open
+
+    [[ "$status" -eq 0 ]]
+    grep -q "Quiet camp" "$TEST_PROJECT/.campsite/camp/index.html"
+    grep -q "Awaiting entry" "$TEST_PROJECT/.campsite/camp/index.html"
+    grep -q "0 participants" "$TEST_PROJECT/.campsite/camp/index.html"
+}
+
 @test "camp participant enter and update persist local state files" {
-    _run_camp participant enter worker-a --name="Claude Worker" --tool=claude --state=bulssi --summary="Started auth work"
+    _run_camp participant enter worker-a --name="Claude Worker" --tool=claude --terminal=ghostty --state=bulssi --summary="Started auth work"
     [[ "$status" -eq 0 ]]
 
-    _run_camp participant update worker-a --state=deungbul --summary="Auth flow is ready for review" --next-action="Review edge cases"
+    _run_camp participant update worker-a --terminal=ghostty --state=deungbul --summary="Auth flow is ready for review" --next-action="Review edge cases"
     [[ "$status" -eq 0 ]]
 
-    grep -q $'^worker-a\tClaude Worker\tagent\tclaude\t\tdeungbul\tAuth flow is ready for review\t\tReview edge cases\t' "$TEST_PROJECT/.campsite/camp/participants.tsv"
+    grep -q $'^worker-a\tClaude Worker\tagent\tclaude\tghostty\tdeungbul\tAuth flow is ready for review\t\tReview edge cases\t' "$TEST_PROJECT/.campsite/camp/participants.tsv"
     grep -q "worker-a" "$TEST_PROJECT/.campsite/camp/events.tsv"
     grep -q "deungbul" "$TEST_PROJECT/.campsite/camp/events.tsv"
 }

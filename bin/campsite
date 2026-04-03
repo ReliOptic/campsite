@@ -667,14 +667,15 @@ cmd_camp() {
                 enter)
                     local participant_id="${1:-}"
                     shift || true
-                    [[ -n "$participant_id" ]] || fail "participant id required" "usage: campsite camp participant enter <id> [--name=...] [--type=...] [--tool=...] [--state=...] [--summary=...] [--next-action=...] [--priority=N]"
+                    [[ -n "$participant_id" ]] || fail "participant id required" "usage: campsite camp participant enter <id> [--name=...] [--type=...] [--tool=...] [--terminal=...] [--state=...] [--summary=...] [--next-action=...] [--priority=N]"
 
-                    local name="$participant_id" ptype="agent" tool="" fire_state="bulssi" summary="" next_action="" priority="50"
+                    local name="$participant_id" ptype="agent" tool="" terminal="" fire_state="bulssi" summary="" next_action="" priority="50"
                     for arg in "$@"; do
                         case "$arg" in
                             --name=*) name="${arg#--name=}" ;;
                             --type=*) ptype="${arg#--type=}" ;;
                             --tool=*) tool="${arg#--tool=}" ;;
+                            --terminal=*) terminal="${arg#--terminal=}" ;;
                             --state=*) fire_state="${arg#--state=}" ;;
                             --summary=*) summary="${arg#--summary=}" ;;
                             --next-action=*) next_action="${arg#--next-action=}" ;;
@@ -683,20 +684,20 @@ cmd_camp() {
                         esac
                     done
 
-                    camp_participant_upsert "$project" "$participant_id" "$name" "$ptype" "$tool" "$fire_state" "$summary" "" "$next_action" "$priority"
+                    camp_participant_upsert "$project" "$participant_id" "$name" "$ptype" "$tool" "$terminal" "$fire_state" "$summary" "" "$next_action" "$priority"
                     camp_event_append "$project" "$participant_id" "" "$fire_state" "${summary:-Entered the camp.}"
                     info "camp participant entered → $participant_id"
                     ;;
                 update)
                     local participant_id="${1:-}"
                     shift || true
-                    [[ -n "$participant_id" ]] || fail "participant id required" "usage: campsite camp participant update <id> [--state=...] [--summary=...] [--blocker=...] [--next-action=...] [--priority=N]"
+                    [[ -n "$participant_id" ]] || fail "participant id required" "usage: campsite camp participant update <id> [--name=...] [--type=...] [--tool=...] [--terminal=...] [--state=...] [--summary=...] [--blocker=...] [--next-action=...] [--priority=N]"
 
                     local existing
                     existing="$(camp_participant_get "$project" "$participant_id")"
                     [[ -n "$existing" ]] || fail "unknown participant: $participant_id" "Run 'campsite camp participant enter $participant_id ...' first."
 
-                    IFS=$'\t' read -r _id name ptype tool fire_state summary blocker next_action _last_updated priority <<< "$existing"
+                    IFS=$'\t' read -r _id name ptype tool terminal fire_state summary blocker next_action _last_updated priority <<< "$existing"
                     local old_state="$fire_state"
 
                     for arg in "$@"; do
@@ -704,6 +705,7 @@ cmd_camp() {
                             --name=*) name="${arg#--name=}" ;;
                             --type=*) ptype="${arg#--type=}" ;;
                             --tool=*) tool="${arg#--tool=}" ;;
+                            --terminal=*) terminal="${arg#--terminal=}" ;;
                             --state=*) fire_state="${arg#--state=}" ;;
                             --summary=*) summary="${arg#--summary=}" ;;
                             --blocker=*) blocker="${arg#--blocker=}" ;;
@@ -713,7 +715,7 @@ cmd_camp() {
                         esac
                     done
 
-                    camp_participant_upsert "$project" "$participant_id" "$name" "$ptype" "$tool" "$fire_state" "$summary" "$blocker" "$next_action" "$priority"
+                    camp_participant_upsert "$project" "$participant_id" "$name" "$ptype" "$tool" "$terminal" "$fire_state" "$summary" "$blocker" "$next_action" "$priority"
                     camp_event_append "$project" "$participant_id" "$old_state" "$fire_state" "${summary:-Updated participant state.}"
                     info "camp participant updated → $participant_id"
                     ;;

@@ -309,40 +309,27 @@ camp_capture_locked_session_on_save() {
     camp_session_finish "$project_root" "$tool" "$pid" "normal" "$state_changed"
 }
 
-camp_default_seed() {
+camp_participant_count() {
     local project_root="$1"
     camp_ensure_store "$project_root"
 
     local participants_file
     participants_file="$(camp_participants_path "$project_root")"
-    if [[ "$(wc -l < "$participants_file" | tr -d ' ')" -gt 1 ]]; then
-        return 0
-    fi
-
-    local last_agent next_task
-    last_agent="$(field_value "$project_root/status.md" "last-agent" 2>/dev/null || echo "claude")"
-    next_task="$(field_value "$project_root/handoff.md" "task" 2>/dev/null || echo "Review current camp state and pick the next action")"
-
-    camp_participant_upsert "$project_root" "${last_agent}-active" "$last_agent" "agent" "$last_agent" "ghostty" "modakbul" "Still working on the current mission thread." "" "" "40"
-    camp_participant_upsert "$project_root" "codex-review" "codex" "agent" "codex" "warp" "deungbul" "A bounded segment is ready for your read." "" "Review the completed segment and decide whether to continue." "20"
-    camp_participant_upsert "$project_root" "gemini-blocked" "gemini" "agent" "gemini" "wezterm" "yeongi" "Blocked on a product tradeoff." "Needs human judgment on the next tradeoff." "" "10"
-    camp_participant_upsert "$project_root" "terminal-next" "terminal" "terminal" "ghostty" "ghostty" "jangjak" "Prepared next action is staged." "" "$next_task" "30"
-
-    camp_event_append "$project_root" "${last_agent}-active" "" "modakbul" "Entered the camp and started active work."
-    camp_event_append "$project_root" "codex-review" "" "deungbul" "Reached a review-ready segment."
-    camp_event_append "$project_root" "gemini-blocked" "" "yeongi" "Needs help choosing the next tradeoff."
-    camp_event_append "$project_root" "terminal-next" "" "jangjak" "Prepared the next action."
+    awk 'NR > 1 { count++ } END { print count + 0 }' "$participants_file"
 }
 
 camp_overview_lines() {
     local project_root="$1"
     camp_ensure_store "$project_root"
-    camp_default_seed "$project_root"
 
     local participants_file
     participants_file="$(camp_participants_path "$project_root")"
+    local mission_file fallback_next_action
+    mission_file="$(camp_mission_path "$project_root")"
+    fallback_next_action="$(camp_field_get "$mission_file" "next-action")"
+    [[ -n "$fallback_next_action" ]] || fallback_next_action="$(field_value "$project_root/handoff.md" "task" 2>/dev/null || echo "Open the mission and choose the next move.")"
 
-    awk -F'\t' '
+    awk -F'\t' -v fallback_next_action="$fallback_next_action" '
         NR == 1 { next }
         $6 == "modakbul" { active[++active_n] = $2 }
         $6 == "deungbul" || $6 == "yeongi" { waiting[++wait_n] = $2 " (" $6 ")" }
@@ -356,10 +343,10 @@ camp_overview_lines() {
             for (i = 1; i <= wait_n; i++) {
                 waiting_line = waiting_line (i > 1 ? ", " : "") waiting[i]
             }
-            if (active_line == "") active_line = "none"
-            if (waiting_line == "") waiting_line = "none"
-            if (next_action == "") next_action = "none prepared"
-            if (next_name == "") next_name = "camp"
+            if (active_line == "") active_line = "none yet"
+            if (waiting_line == "") waiting_line = "none waiting"
+            if (next_action == "") next_action = fallback_next_action
+            if (next_name == "") next_name = "mission"
             print "ACTIVE\t" active_line
             print "WAITING\t" waiting_line
             print "NEXT\t" next_name ": " next_action
@@ -372,7 +359,6 @@ camp_overview_print() {
     local mission_file mission_title
     mission_file="$(camp_mission_path "$project_root")"
     camp_ensure_store "$project_root"
-    camp_default_seed "$project_root"
     mission_title="$(camp_field_get "$mission_file" "title")"
 
     printf '\n'
@@ -418,7 +404,6 @@ camp_render() {
     output_path="$(camp_index_path "$project_root")"
 
     camp_ensure_store "$project_root"
-    camp_default_seed "$project_root"
 
     local mission_file participants_file events_file
     mission_file="$(camp_mission_path "$project_root")"
@@ -459,7 +444,7 @@ camp_render() {
 
     local participant_cards=""
     local participant_count
-    participant_count="$(awk 'NR > 1 { count++ } END { print count + 0 }' "$participants_file")"
+    participant_count="$(camp_participant_count "$project_root")"
     local idx=0
     while IFS=$'\t' read -r _priority id name ptype tool terminal fire_state summary blocker next_action row_updated priority; do
         idx=$((idx + 1))
@@ -493,6 +478,18 @@ camp_render() {
             <div class=\"meta\">$(printf '%s' "$ptype" | camp_html_escape) • $(printf '%s' "$tool" | camp_html_escape) • $(printf '%s' "$terminal" | camp_html_escape)</div>
           </article>"
     done < <(camp_render_participants_dataset "$project_root")
+
+    if [[ "$participant_count" -eq 0 ]]; then
+        participant_cards='
+          <article class="participant participant-empty" data-state="quiet">
+            <header>
+              <h3 class="participant-name">Quiet camp</h3>
+              <span class="state-chip state-quiet">Awaiting entry</span>
+            </header>
+            <p>No agents are in the camp yet. Start from Focus mode, or add a participant when a real session begins.</p>
+            <div class="meta">mission • recovery-first • truthful empty state</div>
+          </article>'
+    fi
 
     local activity_items=""
     local event_count=0
@@ -569,11 +566,13 @@ ${activity_items}"
     .participant[data-state="deungbul"] { box-shadow: 0 0 20px rgba(246,211,101,0.16); }
     .participant[data-state="yeongi"] { box-shadow: 0 0 20px rgba(143,161,179,0.14); }
     .participant[data-state="jangjak"] { box-shadow: 0 0 20px rgba(127,217,143,0.14); }
+    .participant[data-state="quiet"] { box-shadow: 0 0 20px rgba(186,200,220,0.08); }
     .participant-1 { left: 4%; top: 14%; }
     .participant-2 { right: 5%; top: 12%; }
     .participant-3 { left: 10%; bottom: 10%; }
     .participant-4 { right: 8%; bottom: 14%; }
     .participant-extra { left: 50%; bottom: 2%; transform: translateX(-50%); width: min(540px, calc(100% - 48px)); }
+    .participant-empty { left: 50%; bottom: 8%; transform: translateX(-50%); width: min(540px, calc(100% - 48px)); }
     .participant header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
     .participant-name { margin: 0; font-size: 17px; font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif; }
     .state-chip { padding: 4px 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif; }
@@ -582,6 +581,7 @@ ${activity_items}"
     .state-deungbul { background: rgba(246,211,101,0.16); color: var(--review); }
     .state-yeongi { background: rgba(143,161,179,0.15); color: #d5e2ee; }
     .state-jangjak { background: rgba(127,217,143,0.16); color: var(--ready); }
+    .state-quiet { background: rgba(186,200,220,0.10); color: var(--muted); }
     .participant p, .return-block p, .rail-block p, .activity-item p { margin: 0; color: var(--text); line-height: 1.45; font-size: 14px; }
     .participant .meta { margin-top: 10px; }
     .return-panel { padding: 18px; display: flex; flex-direction: column; gap: 14px; }

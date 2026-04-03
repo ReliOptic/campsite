@@ -97,8 +97,10 @@ Completed in this slice so far:
 - added `scripts/hybrid-smoke.sh` as a high-value end-to-end smoke harness
 - added `make test-hybrid` so the automated loop and manual review gate are run together
 - added an execution blueprint that aligns implementation order, UX/UI hierarchy, and emotional direction
+- removed over-talkative seeded camp participants in favor of a truthful quiet-camp empty state
+- fixed manual participant enter/update flows so terminal metadata no longer shifts columns
 
 ## Current Next Move
 
 - tighten the bridge between Camp mode and Focus mode
-- improve live camp summaries and reduce placeholder seeded behavior
+- strengthen live participant summaries and terminal-side copy now that sparse camp behavior is truthful

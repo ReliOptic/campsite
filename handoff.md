@@ -2,7 +2,7 @@
 
 ## Next Action
 
-- task: tighten live camp summaries and reduce placeholder seeded behavior so Camp mode and Focus mode feel more coherent
+- task: strengthen live participant summaries and tighten terminal-side mission copy so Focus mode and Camp mode feel more coherent
 - fallback-task: refine save --push commit staging semantics if tracked-only checkpoints feel too narrow
 - priority: high
 - estimated-scope: medium
@@ -11,7 +11,7 @@
 
 ## Context for Next Session
 
-Campsite now has product philosophy, camp state, freshness helpers, safe checkpoint push, and an active hybrid testing strategy. The next slice should improve the quality of the visible experience: make live camp summaries more trustworthy, reduce placeholder camp noise when the real session graph is sparse, and tighten the emotional bridge between Camp mode and Focus mode.
+Campsite now has product philosophy, camp state, freshness helpers, safe checkpoint push, an active hybrid testing strategy, and a truthful quiet-camp empty state. The next slice should improve the quality of the visible experience again, but now on real sessions instead of fake placeholders: make live participant summaries sharper, tighten terminal mission copy, and keep Camp mode and Focus mode emotionally aligned.
 
 ## Open Questions
 
@@ -29,3 +29,4 @@ Campsite now has product philosophy, camp state, freshness helpers, safe checkpo
 | 2026-04-03 | codex | Added recovery-first camp state, product philosophy docs, family look rules, and design prompt pack | Campsite now has a coherent product world and a real local state layer |
 | 2026-04-03 | codex | Added freshness helpers, Focus-mode language improvements, and `save --push` checkpoint flow | Campsite now has a stronger terminal loop and a usable checkpoint push path |
 | 2026-04-03 | codex | Added hybrid testing strategy, smoke harness, and `make test-hybrid`; fixed bare-remote branch verification in smoke flow | Campsite now has a repeatable reliability loop plus explicit human review gate |
+| 2026-04-03 | codex | Removed seeded fake participants, added a truthful quiet-camp empty state, and fixed manual participant terminal metadata handling | Sparse camps now stay calm and honest instead of over-speaking |
