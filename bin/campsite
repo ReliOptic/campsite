@@ -29,6 +29,7 @@ source "$CAMPSITE_LIB/security.sh"
 source "$CAMPSITE_LIB/compile.sh"
 source "$CAMPSITE_LIB/history.sh"
 source "$CAMPSITE_LIB/ui.sh"
+source "$CAMPSITE_LIB/camp.sh"
 
 # --- Load defaults ---
 if [[ -f "$CAMPSITE_ROOT/config/defaults.sh" ]]; then
@@ -62,6 +63,7 @@ usage:
   campsite validate       Structure + freshness verification
   campsite recover        Clear orphaned locks + stale files
   campsite dashboard      All projects overview
+  campsite camp           Camp state commands and local recovery-first scene
   campsite workspace set <path>   Set workspace root
 
   campsite --version      Print version
@@ -77,6 +79,8 @@ cmd_launcher() {
     local agent="$SELECTED_AGENT"
     local device
     device="$(detect_device)"
+    local terminal_name
+    terminal_name="$(detect_terminal_surface)"
 
     # Validate
     _validate_project "$project" quiet
@@ -97,10 +101,14 @@ cmd_launcher() {
     local compiled_file
     compiled_file="$(compile_context "$project" "$agent")"
     info "context compiled → $(basename "$compiled_file")"
+    camp_register_sync "$project" "$agent"
 
     # Store entry hash
     local entry_hash
     entry_hash="$(hash_compute "$project")"
+    local session_outcome="normal"
+    local session_participant_id
+    session_participant_id="$(camp_session_start "$project" "$agent" "$$" "$terminal_name")"
 
     # Banner
     ui_banner "$project" "$agent" "$device"
@@ -120,11 +128,16 @@ cmd_launcher() {
         # Check if source files were updated
         local current_hash
         current_hash="$(hash_compute "$project" 2>/dev/null || echo "")"
+        local state_changed=0
         if [[ "$current_hash" == "$entry_hash" ]]; then
             printf '\n'
             warn "status.md/handoff.md unchanged during session"
             warn "consider updating before your next session"
+        else
+            state_changed=1
         fi
+
+        camp_session_finish "$project" "$agent" "$$" "$session_outcome" "$state_changed" 2>/dev/null || true
 
         # Cleanup compiled file
         compile_cleanup "$project" "$agent" 2>/dev/null || true
@@ -143,7 +156,7 @@ cmd_launcher() {
 
     # Launch agent as child process (not exec — so trap works)
     cd "$project"
-    "$agent_cmd" || true
+    "$agent_cmd" || session_outcome="error"
 }
 
 # --- campsite init [path] ---
@@ -221,6 +234,7 @@ cmd_sync() {
         local compiled
         compiled="$(compile_context "$project" "$specific_adapter")"
         info "compiled → $(basename "$compiled")"
+        camp_register_sync "$project" "$specific_adapter"
     else
         # Compile for all adapters whose command is in PATH
         local count=0
@@ -233,6 +247,7 @@ cmd_sync() {
                 local compiled
                 compiled="$(compile_context "$project" "$adapter_name")"
                 info "compiled → $(basename "$compiled")"
+                camp_register_sync "$project" "$adapter_name"
                 count=$((count + 1))
             fi
         done < <(adapter_list 2>/dev/null)
@@ -266,6 +281,11 @@ cmd_save() {
     if [[ $hash_rc -eq 0 ]]; then
         warn "source files unchanged since last sync — did you update status.md/handoff.md?"
     fi
+    local state_changed=0
+    [[ $hash_rc -eq 1 ]] && state_changed=1
+
+    camp_sync_mission_from_project "$project"
+    camp_capture_locked_session_on_save "$project" "$state_changed" 2>/dev/null || true
 
     # Cleanup compiled files
     compile_cleanup_all "$project"
@@ -512,6 +532,174 @@ cmd_dashboard() {
     done < <(detect_all_projects "$workspace" 2>/dev/null)
 
     printf '\n'
+}
+
+# --- campsite camp ---
+cmd_camp() {
+    local project
+    project="$(detect_project)"
+    _validate_project "$project" quiet
+    camp_ensure_store "$project"
+
+    local subcommand="${1:-render}"
+    shift || true
+
+    case "$subcommand" in
+        render)
+            local no_open=0
+            local print_path=0
+            for arg in "$@"; do
+                case "$arg" in
+                    --no-open) no_open=1 ;;
+                    --print-path) print_path=1 ;;
+                    *) fail "unknown flag for campsite camp render: $arg" "Valid flags: --no-open, --print-path" ;;
+                esac
+            done
+
+            local html_path
+            html_path="$(camp_render "$project")"
+
+            if [[ $print_path -eq 1 ]]; then
+                printf '%s\n' "$html_path"
+                return 0
+            fi
+
+            info "camp rendered → $html_path"
+            if [[ $no_open -eq 1 ]]; then
+                return 0
+            fi
+
+            if camp_open_browser "$html_path"; then
+                info "opened in browser"
+            else
+                warn "could not open a browser automatically"
+                printf '%s\n' "$html_path"
+            fi
+            ;;
+        overview)
+            camp_overview_print "$project"
+            ;;
+        mission)
+            local action="${1:-}"
+            shift || true
+            [[ "$action" == "set" ]] || fail "usage: campsite camp mission set <title> [--summary=...] [--state=...] [--next-action=...]"
+
+            local title="${1:-}"
+            shift || true
+            [[ -n "$title" ]] || fail "mission title required" "usage: campsite camp mission set <title> [--summary=...] [--state=...] [--next-action=...]"
+
+            local summary="" state="" next_action=""
+            for arg in "$@"; do
+                case "$arg" in
+                    --summary=*) summary="${arg#--summary=}" ;;
+                    --state=*) state="${arg#--state=}" ;;
+                    --next-action=*) next_action="${arg#--next-action=}" ;;
+                    *) fail "unknown flag for campsite camp mission set: $arg" ;;
+                esac
+            done
+
+            camp_set_mission "$project" "$title" "$summary" "$state" "$next_action"
+            info "camp mission updated"
+            ;;
+        participant)
+            local action="${1:-}"
+            shift || true
+            case "$action" in
+                enter)
+                    local participant_id="${1:-}"
+                    shift || true
+                    [[ -n "$participant_id" ]] || fail "participant id required" "usage: campsite camp participant enter <id> [--name=...] [--type=...] [--tool=...] [--state=...] [--summary=...] [--next-action=...] [--priority=N]"
+
+                    local name="$participant_id" ptype="agent" tool="" fire_state="bulssi" summary="" next_action="" priority="50"
+                    for arg in "$@"; do
+                        case "$arg" in
+                            --name=*) name="${arg#--name=}" ;;
+                            --type=*) ptype="${arg#--type=}" ;;
+                            --tool=*) tool="${arg#--tool=}" ;;
+                            --state=*) fire_state="${arg#--state=}" ;;
+                            --summary=*) summary="${arg#--summary=}" ;;
+                            --next-action=*) next_action="${arg#--next-action=}" ;;
+                            --priority=*) priority="${arg#--priority=}" ;;
+                            *) fail "unknown flag for campsite camp participant enter: $arg" ;;
+                        esac
+                    done
+
+                    camp_participant_upsert "$project" "$participant_id" "$name" "$ptype" "$tool" "$fire_state" "$summary" "" "$next_action" "$priority"
+                    camp_event_append "$project" "$participant_id" "" "$fire_state" "${summary:-Entered the camp.}"
+                    info "camp participant entered → $participant_id"
+                    ;;
+                update)
+                    local participant_id="${1:-}"
+                    shift || true
+                    [[ -n "$participant_id" ]] || fail "participant id required" "usage: campsite camp participant update <id> [--state=...] [--summary=...] [--blocker=...] [--next-action=...] [--priority=N]"
+
+                    local existing
+                    existing="$(camp_participant_get "$project" "$participant_id")"
+                    [[ -n "$existing" ]] || fail "unknown participant: $participant_id" "Run 'campsite camp participant enter $participant_id ...' first."
+
+                    IFS=$'\t' read -r _id name ptype tool fire_state summary blocker next_action _last_updated priority <<< "$existing"
+                    local old_state="$fire_state"
+
+                    for arg in "$@"; do
+                        case "$arg" in
+                            --name=*) name="${arg#--name=}" ;;
+                            --type=*) ptype="${arg#--type=}" ;;
+                            --tool=*) tool="${arg#--tool=}" ;;
+                            --state=*) fire_state="${arg#--state=}" ;;
+                            --summary=*) summary="${arg#--summary=}" ;;
+                            --blocker=*) blocker="${arg#--blocker=}" ;;
+                            --next-action=*) next_action="${arg#--next-action=}" ;;
+                            --priority=*) priority="${arg#--priority=}" ;;
+                            *) fail "unknown flag for campsite camp participant update: $arg" ;;
+                        esac
+                    done
+
+                    camp_participant_upsert "$project" "$participant_id" "$name" "$ptype" "$tool" "$fire_state" "$summary" "$blocker" "$next_action" "$priority"
+                    camp_event_append "$project" "$participant_id" "$old_state" "$fire_state" "${summary:-Updated participant state.}"
+                    info "camp participant updated → $participant_id"
+                    ;;
+                *)
+                    fail "usage: campsite camp participant <enter|update> ..."
+                    ;;
+            esac
+            ;;
+        "")
+            fail "usage: campsite camp <render|overview|mission|participant> ..."
+            ;;
+        *)
+            # Backward-compatible flag-only usage maps to render.
+            set -- "$subcommand" "$@"
+            local no_open=0
+            local print_path=0
+            for arg in "$@"; do
+                case "$arg" in
+                    --no-open) no_open=1 ;;
+                    --print-path) print_path=1 ;;
+                    *) fail "unknown camp command: $subcommand" "Valid commands: render, overview, mission, participant" ;;
+                esac
+            done
+
+            local html_path
+            html_path="$(camp_render "$project")"
+
+            if [[ $print_path -eq 1 ]]; then
+                printf '%s\n' "$html_path"
+                return 0
+            fi
+
+            info "camp rendered → $html_path"
+            if [[ $no_open -eq 1 ]]; then
+                return 0
+            fi
+
+            if camp_open_browser "$html_path"; then
+                info "opened in browser"
+            else
+                warn "could not open a browser automatically"
+                printf '%s\n' "$html_path"
+            fi
+            ;;
+    esac
 }
 
 # --- campsite setup helpers ---
@@ -789,6 +977,17 @@ cmd_peek() {
         printf "  task:      %s\n" "$task"
         printf "  pid:       %s (%b)\n" "$pid" "$pid_status"
         printf '\n'
+
+        if [[ -f "$(camp_participants_path "$project")" ]]; then
+            while IFS=$'\t' read -r label value; do
+                case "$label" in
+                    ACTIVE) printf "  camp-now:  %s\n" "$value" ;;
+                    WAITING) printf "  camp-wait: %s\n" "$value" ;;
+                    NEXT) printf "  camp-next: %s\n" "$value" ;;
+                esac
+            done < <(camp_overview_lines "$project")
+            printf '\n'
+        fi
     }
 
     if [[ $live -eq 1 ]]; then
@@ -940,6 +1139,9 @@ main() {
             ;;
         dashboard)
             shift; cmd_dashboard "$@"
+            ;;
+        camp)
+            shift; cmd_camp "$@"
             ;;
         workspace)
             shift

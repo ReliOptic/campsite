@@ -94,3 +94,17 @@ teardown() {
     [[ "$result" == *"campsite-project"* ]]
     [[ "$result" != *"not-a-project"* ]]
 }
+
+# --- detect_terminal_surface tests ---
+
+@test "detect_terminal_surface prefers TERM_PROGRAM when known" {
+    TERM_PROGRAM=ghostty run detect_terminal_surface
+    [[ "$status" -eq 0 ]]
+    [[ "$output" == "ghostty" ]]
+}
+
+@test "detect_terminal_surface detects tmux" {
+    TMUX=/tmp/tmux-test TERM_PROGRAM= run detect_terminal_surface
+    [[ "$status" -eq 0 ]]
+    [[ "$output" == "tmux" ]]
+}

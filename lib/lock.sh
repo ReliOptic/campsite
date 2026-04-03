@@ -40,8 +40,7 @@ lock_acquire() {
         [[ -n "$task" ]] && printf 'task: %s\n' "$task"
         # Terminal identifier (for multi-terminal disambiguation)
         local _tty
-        _tty="$(tty 2>/dev/null)" || _tty="unknown"
-        [[ "$_tty" == "not a tty" ]] && _tty="non-interactive"
+        _tty="$(detect_terminal_surface)"
         printf 'terminal: %s\n' "$_tty"
     } > "$lock_file"
 }

@@ -108,3 +108,56 @@ detect_all_projects() {
     [[ $found -gt 0 ]] || fail "no campsite projects found under $root" \
         "Run 'campsite init <path>' to create a project, or check workspace path"
 }
+
+# Detect the user-facing terminal surface more accurately than raw tty paths.
+detect_terminal_surface() {
+    if [[ -n "${TERM_PROGRAM:-}" ]]; then
+        case "$(printf '%s' "$TERM_PROGRAM" | tr '[:upper:]' '[:lower:]')" in
+            ghostty) printf 'ghostty'; return 0 ;;
+            warpterminal|warp) printf 'warp'; return 0 ;;
+            wezterm) printf 'wezterm'; return 0 ;;
+            apple_terminal) printf 'terminal.app'; return 0 ;;
+            iterm.app) printf 'iterm'; return 0 ;;
+            vscode) printf 'vscode-terminal'; return 0 ;;
+            hyper) printf 'hyper'; return 0 ;;
+        esac
+    fi
+
+    if [[ -n "${GHOSTTY_RESOURCES_DIR:-}" ]]; then
+        printf 'ghostty'
+        return 0
+    fi
+
+    if [[ -n "${WEZTERM_EXECUTABLE:-}${WEZTERM_PANE:-}" ]]; then
+        printf 'wezterm'
+        return 0
+    fi
+
+    if [[ -n "${KITTY_PID:-}" ]]; then
+        printf 'kitty'
+        return 0
+    fi
+
+    if [[ -n "${ALACRITTY_SOCKET:-}" ]]; then
+        printf 'alacritty'
+        return 0
+    fi
+
+    if [[ -n "${TMUX:-}" ]]; then
+        printf 'tmux'
+        return 0
+    fi
+
+    if [[ -n "${STY:-}" ]]; then
+        printf 'screen'
+        return 0
+    fi
+
+    local tty_name
+    tty_name="$(tty 2>/dev/null || echo "unknown")"
+    case "$tty_name" in
+        "not a tty") printf 'non-interactive' ;;
+        /dev/*) basename "$tty_name" ;;
+        *) printf '%s' "$tty_name" ;;
+    esac
+}
