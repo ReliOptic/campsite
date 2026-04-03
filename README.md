@@ -244,6 +244,7 @@ campsite save
 | `campsite init [path]` | Bootstrap a new project |
 | `campsite sync` | Compile project state into agent-native context files |
 | `campsite save` | End-of-session cleanup |
+| `campsite save --push` | Create and push a safe checkpoint commit |
 | `campsite status` | Show current project summary |
 | `campsite peek` | View the active session from another terminal |
 | `campsite camp overview` | Show recovery-first camp summary |

@@ -7,6 +7,8 @@
 > For recovery-first product direction, see [spec-driven-prd-vibe-camp.md](spec-driven-prd-vibe-camp.md).
 > For family look rules across Camp mode and Focus mode, see [family-look-spec.md](family-look-spec.md).
 > For terminal foundation boundaries, see [libghostty-foundation-boundary.md](libghostty-foundation-boundary.md).
+> For reliability + review test discipline, see [hybrid-testing-strategy.md](hybrid-testing-strategy.md).
+> For the combined execution, UX/UI, and emotional blueprint, see [experience-execution-blueprint.md](experience-execution-blueprint.md).
 
 ---
 
@@ -63,10 +65,17 @@ End-of-session cleanup.
 
 ```bash
 campsite save
+campsite save --push
 ```
 
 Steps: credential scan → change detection warning → delete compiled
 files → release lock → store hash.
+
+With `--push`, Campsite also:
+
+- creates a conservative checkpoint commit from tracked changes
+- uses a generated commit message based on phase and next task
+- pushes the current branch to `origin/<branch>`
 
 ### `campsite status`
 

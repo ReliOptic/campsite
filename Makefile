@@ -4,7 +4,7 @@ CURDIR := $(shell pwd)
 
 SHELL_FILES := bin/campsite $(wildcard lib/*.sh) $(wildcard adapters/*.sh)
 
-.PHONY: help install uninstall dev test test-unit test-integration lint check
+.PHONY: help install uninstall dev test test-unit test-integration test-hybrid lint check
 
 help:
 	@printf '%s\n' \
@@ -19,6 +19,7 @@ help:
 		"  make test        Run all tests (unit + integration)" \
 		"  make test-unit   Run unit tests only" \
 		"  make test-integration  Run integration tests only" \
+		"  make test-hybrid Run the hybrid smoke harness + review guidance" \
 		"  make lint        Run shellcheck on all shell files" \
 		"  make check       Run lint + test"
 
@@ -102,6 +103,16 @@ test-smoke:
 	@printf '%s\n' "Running smoke tests..."
 	@bash bin/campsite --version
 	@printf '\033[32m%s\033[0m\n' "Smoke tests passed"
+
+test-hybrid:
+	@printf '%s\n' "Running hybrid smoke harness..."
+	@bash scripts/hybrid-smoke.sh
+	@printf '%s\n' ""
+	@printf '%s\n' "Manual review gate:"
+	@printf '%s\n' "  1. Open the camp scene and check 5-second clarity"
+	@printf '%s\n' "  2. Verify Focus mode and Camp mode use the same state language"
+	@printf '%s\n' "  3. Verify the output feels calm, not frantic"
+	@printf '\033[32m%s\033[0m\n' "Hybrid smoke complete"
 
 lint:
 	@printf '%s\n' "Running shellcheck..."

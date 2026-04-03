@@ -22,3 +22,6 @@ CAMPSITE_SOURCE_FILES="${CAMPSITE_SOURCE_FILES:-status.md handoff.md}"
 
 # Number of recent decisions to include in compiled context
 CAMPSITE_DECISION_COUNT="${CAMPSITE_DECISION_COUNT:-5}"
+
+# Set to 1 to let `campsite save` attempt a checkpoint commit + push by default
+CAMPSITE_SAVE_PUSH="${CAMPSITE_SAVE_PUSH:-0}"

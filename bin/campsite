@@ -57,6 +57,7 @@ usage:
   campsite init [path]    Bootstrap a new campsite project
   campsite sync           Compile source of truth → agent context files
   campsite save           Verify updates + cleanup + unlock
+  campsite save --push    Create and push a safe checkpoint commit
   campsite status         Current project state summary
   campsite peek           View active session from another terminal
   campsite go [name|#]    Jump to recent project (cd + optional sync)
@@ -264,8 +265,54 @@ cmd_sync() {
     info "hash stored"
 }
 
+_checkpoint_commit_message() {
+    local project="$1"
+    local phase task
+    phase="$(field_value "$project/status.md" "phase" 2>/dev/null || echo "checkpoint")"
+    task="$(field_value "$project/handoff.md" "task" 2>/dev/null || echo "update project state")"
+    printf 'checkpoint: %s - %s' "$phase" "$task"
+}
+
+_git_repo_root() {
+    local project="$1"
+    git -C "$project" rev-parse --show-toplevel 2>/dev/null || return 1
+}
+
+_save_git_checkpoint_push() {
+    local project="$1"
+    local repo_root branch
+    repo_root="$(_git_repo_root "$project")" || {
+        warn "save --push skipped: project is not inside a git repository"
+        return 0
+    }
+
+    branch="$(git -C "$repo_root" branch --show-current 2>/dev/null || echo "")"
+    [[ -n "$branch" ]] || branch="master"
+
+    git -C "$repo_root" add -u || return 1
+    if ! git -C "$repo_root" diff --cached --quiet --exit-code; then
+        local message
+        message="$(_checkpoint_commit_message "$project")"
+        git -C "$repo_root" commit -m "$message" >/dev/null || return 1
+        info "checkpoint committed"
+    else
+        info "no tracked git changes to checkpoint"
+    fi
+
+    git -C "$repo_root" push origin "$branch"
+    info "checkpoint pushed → origin/$branch"
+}
+
 # --- campsite save ---
 cmd_save() {
+    local do_push="${CAMPSITE_SAVE_PUSH:-0}"
+    for arg in "$@"; do
+        case "$arg" in
+            --push) do_push=1 ;;
+            *) fail "unknown flag for campsite save: $arg" "Valid flags: --push" ;;
+        esac
+    done
+
     local project
     project="$(detect_project)"
 
@@ -300,6 +347,10 @@ cmd_save() {
     # Store current hash
     hash_store "$project"
     info "save complete: $(basename "$project")"
+
+    if [[ "$do_push" == "1" ]]; then
+        _save_git_checkpoint_push "$project"
+    fi
 }
 
 # --- campsite status ---
@@ -319,14 +370,20 @@ cmd_status() {
     last_agent="$(field_value "$project/status.md" "last-agent" 2>/dev/null || echo "?")"
     local last_device
     last_device="$(field_value "$project/status.md" "last-device" 2>/dev/null || echo "?")"
+    local freshness_level
+    freshness_level="$(freshness_level_for_file "$project/status.md")"
+    local freshness_label
+    freshness_label="$(freshness_label_for_file "$project/status.md")"
 
     printf '\n'
     printf "  ${_C_BOLD:-}%s${_C_RESET:-}\n" "$name"
+    printf "  mission:      %s\n" "$(field_value "$project/handoff.md" "task" 2>/dev/null || echo "?")"
     printf "  phase:        %s\n" "$phase"
     printf "  confidence:   %s\n" "$confidence"
     printf "  last-updated: %s\n" "$last_updated"
     printf "  last-agent:   %s\n" "$last_agent"
     printf "  last-device:  %s\n" "$last_device"
+    printf "  freshness:    %s (%s)\n" "$freshness_level" "$freshness_label"
 
     # Lock
     if lock_is_held "$project" 2>/dev/null; then
@@ -353,7 +410,13 @@ cmd_status() {
     # Next task
     local task
     task="$(field_value "$project/handoff.md" "task" 2>/dev/null || echo "?")"
-    printf "  next:         %s\n" "$task"
+    printf "  next-move:    %s\n" "$task"
+    while IFS=$'\t' read -r label value; do
+        case "$label" in
+            ACTIVE) printf "  working-now:  %s\n" "$value" ;;
+            WAITING) printf "  waiting-on-you: %s\n" "$value" ;;
+        esac
+    done < <(camp_overview_lines "$project")
     printf '\n'
 }
 
@@ -396,15 +459,11 @@ _validate_project() {
 
     # Freshness check
     if [[ "$mode" == "verbose" ]]; then
-        local stale_seconds=$(( ${CAMPSITE_STALE_DAYS:-2} * 86400 ))
-        local mtime now_epoch age
-        mtime="$(portable_stat_mtime "$project/status.md" 2>/dev/null || echo 0)"
-        now_epoch="$(date +%s)"
-        age=$(( now_epoch - mtime ))
-        if [[ $age -gt $stale_seconds ]]; then
-            local days=$(( age / 86400 ))
-            warn "status.md is ${days} days old"
-        fi
+        local status_freshness handoff_freshness
+        status_freshness="$(freshness_level_for_file "$project/status.md")"
+        handoff_freshness="$(freshness_level_for_file "$project/handoff.md")"
+        [[ "$status_freshness" == "stale" ]] && warn "status.md is $(freshness_label_for_file "$project/status.md")"
+        [[ "$handoff_freshness" == "stale" ]] && warn "handoff.md is $(freshness_label_for_file "$project/handoff.md")"
     fi
 }
 
@@ -974,7 +1033,7 @@ cmd_peek() {
         printf "  device:    %s\n" "$host"
         printf "  terminal:  %s\n" "$terminal"
         printf "  started:   %s (%s)\n" "$started" "$elapsed_str"
-        printf "  task:      %s\n" "$task"
+        printf "  mission:   %s\n" "$task"
         printf "  pid:       %s (%b)\n" "$pid" "$pid_status"
         printf '\n'
 
@@ -1029,7 +1088,7 @@ cmd_go() {
     if [[ -z "$target" ]]; then
         # Interactive: show MRU list
         printf '\n'
-        printf "  ${_C_BOLD:-}Recent projects:${_C_RESET:-}\n"
+    printf "  ${_C_BOLD:-}Recent projects:${_C_RESET:-}\n"
         local idx=1
         for i in "${!mru_names[@]}"; do
             local rel_time=""

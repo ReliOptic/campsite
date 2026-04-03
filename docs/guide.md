@@ -18,7 +18,8 @@
 7. [Cross-Device Workflow](#7-cross-device-workflow)
 8. [Multi-Project Management](#8-multi-project-management)
 9. [Crash Recovery](#9-crash-recovery)
-10. [The One Discipline That Matters](#10-the-one-discipline-that-matters)
+10. [Testing The Right Way](#10-testing-the-right-way)
+11. [The One Discipline That Matters](#11-the-one-discipline-that-matters)
 
 ---
 
@@ -379,7 +380,42 @@ Shows agent name, user, device, elapsed time, current task, PID status.
 
 ---
 
-## 10. The One Discipline That Matters
+## 10. Testing The Right Way
+
+Campsite should not be tested with only one style of loop.
+
+Use a hybrid approach:
+
+- automated loop tests for command and state correctness
+- human review for recovery quality, clarity, and vibe
+
+Quick command:
+
+```bash
+make test-hybrid
+```
+
+This runs a smoke harness for:
+
+- status
+- sync
+- camp overview
+- camp render
+- save --push
+
+Then you should still manually review:
+
+- whether the camp is understandable in 5 seconds
+- whether Focus mode and Camp mode feel like one world
+- whether the output stays calm and truthful
+
+Full strategy:
+
+- [docs/hybrid-testing-strategy.md](hybrid-testing-strategy.md)
+
+---
+
+## 11. The One Discipline That Matters
 
 Campsite requires exactly one habit:
 

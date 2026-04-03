@@ -114,3 +114,29 @@ teardown() {
     [[ ! -f "$new_project/CLAUDE.md" ]]
     [[ ! -f "$new_project/.campsite/lock" ]]
 }
+
+@test "save --push creates checkpoint commit for tracked changes" {
+    cd "$TEST_PROJECT"
+
+    git init -b master >/dev/null 2>&1
+    git config user.name "Test User"
+    git config user.email "test@example.com"
+    git add .
+    git commit -m "initial" >/dev/null 2>&1
+
+    local bare_remote="$TEST_TEMP_DIR/remote.git"
+    git init --bare "$bare_remote" >/dev/null 2>&1
+    git remote add origin "$bare_remote"
+    git push -u origin master >/dev/null 2>&1
+
+    echo "- note: checkpoint" >> "$TEST_PROJECT/status.md"
+
+    run bash -c "
+        export CAMPSITE_HOME='$CAMPSITE_HOME'
+        cd '$TEST_PROJECT'
+        '$PROJECT_ROOT/bin/campsite' save --push
+    "
+
+    [[ "$status" -eq 0 ]]
+    git log --oneline -1 | grep -q "checkpoint:"
+}

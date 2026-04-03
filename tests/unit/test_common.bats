@@ -132,3 +132,17 @@ EOF
     result="$(today_date)"
     [[ "$result" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]
 }
+
+# --- freshness tests ---
+
+@test "freshness_level_for_file returns fresh for new file" {
+    touch "$TEST_TEMP_DIR/fresh.txt"
+    result="$(freshness_level_for_file "$TEST_TEMP_DIR/fresh.txt")"
+    [[ "$result" == "fresh" ]]
+}
+
+@test "freshness_label_for_file returns age label" {
+    touch "$TEST_TEMP_DIR/fresh.txt"
+    result="$(freshness_label_for_file "$TEST_TEMP_DIR/fresh.txt")"
+    [[ "$result" == *"old" ]]
+}

@@ -2,11 +2,11 @@
 
 ## Current State
 
-- phase: discovery
+- phase: building
 - confidence: medium
-- last-updated: 2026-03-20
+- last-updated: 2026-04-03
 - last-agent: codex
-- last-device: /root
+- last-device: Kiwonui-MacBookAir
 
 ## Active Branch
 
@@ -15,23 +15,27 @@
 
 ## What Works
 
-- Product direction is defined around cross-device context continuity.
-- A concrete repository skeleton now exists for the Campsite project itself.
-- The PRD now frames Campsite as a harness product, not just a context template.
-- A technical strategy document now maps Campsite to observability, verification, recovery, and operator intervention.
-- A single `campsite` CLI now exists as the main entrypoint.
-- Agent wrapper commands now launch `claude`, `codex`, `gemini`, and `openclaw` inside the Campsite session protocol.
-- The product surface is now being reframed around checkpoint commands: `enter`, `resume`, `handoff`, `leave`.
+- Product identity is now framed as a recovery-first AI workspace.
+- README now introduces Campsite around 발상, 검토, 체력.
+- Camp mode / Focus mode family look and product philosophy are documented.
+- Local camp state now exists with mission, participants, events, and session snapshots.
+- `sync`, active sessions, `save`, and `peek` now integrate with camp state.
+- A local camp render prototype exists and reads real camp state.
+- Terminal surface detection is stronger and now captures Ghostty/tmux-like environments more accurately.
+- Freshness helpers now exist and are surfaced in terminal-facing status flows.
+- `campsite save --push` now creates a conservative checkpoint commit and pushes it to the current branch.
+- A hybrid testing strategy now exists, with a smoke harness covering `status`, `sync`, `camp overview`, `camp render`, and `save --push`.
+- Design asset prompts and folder structure now exist for future visual production.
+- Implementation work is now tracked in `docs/implementation-tracker.md`.
 
 ## What Does Not Work Yet
 
-- No freshness validator exists yet.
-- Advisory locking exists, but stale-lock recovery is not implemented yet.
-- No automated session-end evidence enforcement exists yet.
+- Freshness is still mostly advisory and not yet used to drive stronger launcher confidence or blocking semantics.
+- Focus mode terminal copy is improved but still not fully Campsite-native across every command path.
+- The camp scene is still a structural prototype and not yet wired to live visual assets.
 
 ## Blockers
 
-- Need first real workspace project to validate the handoff protocol.
-- Need measured overhead targets so the fieldkit does not become bureaucratic.
-- Need real-agent trials to confirm the wrapper benefit against Claude/Codex/Gemini CLIs.
-- Need stale-lock and freshness behavior before the checkpoint story is fully credible.
+- `bats` is not available in the current environment, so new tests are being added but not executed automatically here.
+- Need better live camp summaries so default seeded participants do not over-speak when real state is sparse.
+- Need a clear product decision on whether future checkpoint push should include new untracked files or stay tracked-only.

@@ -112,3 +112,40 @@ now_iso() {
 today_date() {
     date -u '+%Y-%m-%d'
 }
+
+file_age_seconds() {
+    local file="$1"
+    local mtime now_epoch
+    mtime="$(portable_stat_mtime "$file" 2>/dev/null || echo 0)"
+    now_epoch="$(date +%s)"
+    printf '%s' $(( now_epoch - mtime ))
+}
+
+freshness_level_for_file() {
+    local file="$1"
+    local stale_seconds=$(( ${CAMPSITE_STALE_DAYS:-2} * 86400 ))
+    local age
+    age="$(file_age_seconds "$file")"
+
+    if [[ "$age" -le $(( stale_seconds / 2 )) ]]; then
+        printf 'fresh'
+    elif [[ "$age" -le "$stale_seconds" ]]; then
+        printf 'aging'
+    else
+        printf 'stale'
+    fi
+}
+
+freshness_label_for_file() {
+    local file="$1"
+    local age
+    age="$(file_age_seconds "$file")"
+
+    if [[ "$age" -lt 3600 ]]; then
+        printf '%dm old' $(( age / 60 ))
+    elif [[ "$age" -lt 86400 ]]; then
+        printf '%dh old' $(( age / 3600 ))
+    else
+        printf '%dd old' $(( age / 86400 ))
+    fi
+}
