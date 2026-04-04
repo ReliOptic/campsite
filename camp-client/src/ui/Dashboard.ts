@@ -11,6 +11,8 @@ import { ReturnOverlay } from './ReturnOverlay';
  *
  * Creates the DOM structure and child components, reads CampState
  * from StateLoader, and distributes data to children.
+ *
+ * Polls camp.json every 10 seconds for live updates.
  */
 export class Dashboard {
   private container: HTMLElement;
@@ -21,6 +23,7 @@ export class Dashboard {
   private participantBar: ParticipantBar;
   private returnOverlay: ReturnOverlay | null = null;
   private loader: StateLoader;
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     this.loader = new StateLoader();
@@ -59,6 +62,9 @@ export class Dashboard {
 
     // Show return overlay if there's a last session
     this.showReturnOverlay();
+
+    // Start live polling (10 second interval)
+    this.startPolling();
   }
 
   private buildHeader(): void {
@@ -81,9 +87,10 @@ export class Dashboard {
   private showReturnOverlay(): void {
     const lastSession = this.loader.getLastSession();
     const events = this.loader.getEventsSummary();
+    const recovery = this.loader.getRecovery();
 
     // Always show overlay (welcome for new, return for existing)
-    this.returnOverlay = new ReturnOverlay(lastSession, events);
+    this.returnOverlay = new ReturnOverlay(lastSession, events, recovery);
     this.returnOverlay.onDismiss = () => {
       this.returnOverlay = null;
     };
@@ -99,8 +106,23 @@ export class Dashboard {
       this.loader.getMissionStatus(),
     );
     this.nextActionCard.update(this.loader.getNextAction());
-    this.eventFeed.updateFromStrings(this.loader.getEventsSummary());
+
+    // Prefer structured events from collector, fall back to string summaries
+    const structuredEvents = this.loader.getEvents();
+    if (structuredEvents.length > 0) {
+      this.eventFeed.updateFromStateEvents(structuredEvents);
+    } else {
+      this.eventFeed.updateFromStrings(this.loader.getEventsSummary());
+    }
+
     this.participantBar.update(this.loader.getParticipants());
+
+    // Update header status with fire label
+    const fireLabel = this.loader.getFireLabel();
+    const statusEl = this.container.querySelector('.dash-header__status');
+    if (statusEl && fireLabel) {
+      statusEl.textContent = fireLabel;
+    }
   }
 
   /**
@@ -109,5 +131,30 @@ export class Dashboard {
   update(): void {
     this.loader = new StateLoader();
     this.refresh();
+  }
+
+  /**
+   * Start polling camp.json every 10 seconds for live updates.
+   */
+  private startPolling(): void {
+    this.pollTimer = setInterval(async () => {
+      try {
+        const response = await fetch('camp.json?t=' + Date.now());
+        if (!response.ok) return;
+        const data = await response.json();
+        (window as unknown as Record<string, unknown>).CAMP_STATE = data;
+        this.update();
+      } catch {
+        // Silently ignore fetch errors (server may be down)
+      }
+    }, 10_000);
+  }
+
+  /** Stop live polling. */
+  stopPolling(): void {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
   }
 }

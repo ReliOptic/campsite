@@ -31,6 +31,9 @@ source "$CAMPSITE_LIB/history.sh"
 source "$CAMPSITE_LIB/ui.sh"
 source "$CAMPSITE_LIB/camp.sh"
 source "$CAMPSITE_LIB/camp-assets.sh"
+source "$CAMPSITE_LIB/collector.sh"
+source "$CAMPSITE_LIB/agent.sh"
+source "$CAMPSITE_LIB/firestate.sh"
 
 # --- Load defaults ---
 if [[ -f "$CAMPSITE_ROOT/config/defaults.sh" ]]; then
@@ -163,9 +166,9 @@ cmd_launcher() {
     adapter_load "$agent"
     local agent_cmd="$ADAPTER_COMMAND"
 
-    # Launch agent as child process (not exec — so trap works)
+    # Launch agent with lifecycle monitoring (not exec — so trap works)
     cd "$project"
-    "$agent_cmd" || session_outcome="error"
+    agent_launch "$project" "$agent" "$agent_cmd" || session_outcome="error"
 }
 
 # --- campsite init [path] ---
@@ -210,6 +213,11 @@ cmd_init() {
     _render_if_missing "$CAMPSITE_TEMPLATES/project-bootstrap.sh.template"    "$project_root/scripts/bootstrap.sh"
 
     [[ -f "$project_root/scripts/bootstrap.sh" ]] && chmod +x "$project_root/scripts/bootstrap.sh"
+
+    # Install git post-commit hook for automatic signal collection
+    collector_install_git_hook "$project_root"
+    collector_ensure_store "$project_root"
+    collector_record_event "$project_root" "init" "Project initialized" "campsite"
 
     info "project initialized: $project_root"
 }
@@ -267,6 +275,10 @@ cmd_sync() {
             printf "  Or compile for a specific adapter: campsite sync --adapter=claude\n" >&2
         fi
     fi
+
+    # Capture git snapshot + record sync event
+    collector_git_snapshot "$project" 2>/dev/null || true
+    collector_record_event "$project" "sync" "Context compiled for ${specific_adapter:-all} adapters" "campsite" 2>/dev/null || true
 
     # Store hash + sync state (git HEAD snapshot for crash recovery)
     hash_store "$project"
@@ -354,6 +366,10 @@ cmd_save() {
     camp_sync_mission_from_project "$project"
     camp_capture_locked_session_on_save "$project" "$state_changed" 2>/dev/null || true
 
+    # Record save event + file activity
+    collector_file_activity "$project" 2>/dev/null || true
+    collector_record_event "$project" "save" "Project state saved" "user" 2>/dev/null || true
+
     # Cleanup compiled files
     compile_cleanup_all "$project"
     info "compiled files cleaned"
@@ -411,8 +427,14 @@ cmd_status() {
     local task
     task="$(field_value "$project/handoff.md" "task" 2>/dev/null || echo "?")"
 
+    # Derive fire state from real signals
+    local fire_state fire_label
+    fire_state="$(firestate_derive "$project" 2>/dev/null || echo "deungbul")"
+    fire_label="$(firestate_label_ko "$fire_state")"
+
     printf '\n'
     printf "  ${_C_BOLD:-}%s${_C_RESET:-}\n" "$name"
+    printf "  fire:             %s\n" "$fire_label"
     printf "  mission:          %s\n" "$task"
     printf '\n'
 
@@ -991,14 +1013,11 @@ cmd_export() {
     fi
     [[ -n "$mission_title" ]] || mission_title="(no mission set)"
 
-    # ── fire_state ────────────────────────────────────────────────────────────
-    local fire_state="bulssi"
-    local fire_state_file="$camp_d/fire-state"
-    if [[ -f "$fire_state_file" ]]; then
-        local raw_fire
-        raw_fire="$(tr -d '[:space:]' < "$fire_state_file" 2>/dev/null || true)"
-        [[ -n "$raw_fire" ]] && fire_state="$raw_fire"
-    fi
+    # ── fire_state (derived from real signals) ──────────────────────────────
+    local fire_state
+    fire_state="$(firestate_derive "$project" 2>/dev/null || echo "bulssi")"
+    local fire_label
+    fire_label="$(firestate_label_ko "$fire_state")"
 
     # ── animal (from .campsite/project.meta, key animal=) ─────────────────────
     local animal="fox"
@@ -1033,25 +1052,7 @@ cmd_export() {
     fi
     [[ -n "$last_session" ]] || last_session="$(now_iso)"
 
-    # ── events_summary (last 3 summary fields from events.tsv) ───────────────
-    # events.tsv columns: created_at  participant_id  from_state  to_state  summary
-    local ev1="" ev2="" ev3=""
-    if [[ -f "$events_file" ]]; then
-        local ev_lines
-        ev_lines="$(awk -F'\t' 'NR > 1 && $5 != "" { print $5 }' "$events_file" 2>/dev/null | tail -3)"
-        local ev_count=0
-        while IFS= read -r line; do
-            ev_count=$((ev_count + 1))
-            case $ev_count in
-                1) ev1="$line" ;;
-                2) ev2="$line" ;;
-                3) ev3="$line" ;;
-            esac
-        done <<< "$ev_lines"
-    fi
-
     # ── JSON escape helper ────────────────────────────────────────────────────
-    # Escapes backslash, double-quote, and common control chars; bash 3.2 safe.
     _json_esc() {
         printf '%s' "$1" \
             | sed \
@@ -1064,29 +1065,131 @@ cmd_export() {
     local project_name
     project_name="$(basename "$project")"
 
-    # ── Build events_summary JSON array ──────────────────────────────────────
-    local events_json="[]"
-    if [[ -n "$ev1" || -n "$ev2" || -n "$ev3" ]]; then
-        local arr="["
-        local first=1
-        local ev
-        for ev in "$ev1" "$ev2" "$ev3"; do
-            [[ -z "$ev" ]] && continue
-            [[ $first -eq 0 ]] && arr="$arr,"
-            arr="$arr\"$(_json_esc "$ev")\""
-            first=0
-        done
-        arr="$arr]"
-        events_json="$arr"
+    # ── next_action ──────────────────────────────────────────────────────────
+    local next_action=""
+    if [[ -f "$mission_file" ]]; then
+        next_action="$(camp_field_get "$mission_file" "next-action")"
+    fi
+    [[ -n "$next_action" ]] || next_action="$(field_value "$project/handoff.md" "task" 2>/dev/null || echo "")"
+
+    # ── Build participants JSON array (from agent sessions) ──────────────────
+    local participants_json="[]"
+    local active_list
+    active_list="$(agent_list_active "$project" 2>/dev/null || true)"
+    if [[ -n "$active_list" ]]; then
+        local parr="["
+        local pfirst=1
+        while IFS=$'\t' read -r sid sname sstarted; do
+            [[ -z "$sid" ]] && continue
+            [[ $pfirst -eq 0 ]] && parr="$parr,"
+            parr="$parr{\"name\":\"$(_json_esc "$sname")\",\"status\":\"active\",\"startedAt\":\"$(_json_esc "$sstarted")\"}"
+            pfirst=0
+        done <<< "$active_list"
+        parr="$parr]"
+        participants_json="$parr"
     fi
 
+    # Also include recently finished participants from camp participants.tsv
+    if [[ "$participants_json" == "[]" ]] && [[ -f "$participants_file" ]]; then
+        local camp_parr="["
+        local cpfirst=1
+        while IFS=$'\t' read -r pid pname ptype ptool pterminal pfire psummary pblocker pnext plast pprio; do
+            [[ "$pid" == "id" ]] && continue
+            [[ -z "$pid" ]] && continue
+            [[ $cpfirst -eq 0 ]] && camp_parr="$camp_parr,"
+            local pstatus="ended"
+            [[ "$pfire" == "modakbul" || "$pfire" == "bulssi" ]] && pstatus="active"
+            [[ "$pfire" == "yeongi" ]] && pstatus="error"
+            camp_parr="$camp_parr{\"name\":\"$(_json_esc "$pname")\",\"status\":\"$pstatus\"}"
+            cpfirst=0
+        done < "$participants_file"
+        camp_parr="$camp_parr]"
+        participants_json="$camp_parr"
+    fi
+
+    # ── Build events JSON array (from collector signals) ─────────────────────
+    local events_json="[]"
+    local signals_events_file
+    signals_events_file="$(_collector_events_path "$project" 2>/dev/null || echo "")"
+
+    # Try collector events first (real data), fall back to camp events
+    local events_source=""
+    if [[ -n "$signals_events_file" && -f "$signals_events_file" ]]; then
+        events_source="$signals_events_file"
+    elif [[ -f "$events_file" ]]; then
+        events_source="$events_file"
+    fi
+
+    if [[ -n "$events_source" ]]; then
+        local earr="["
+        local efirst=1
+        # Read last 5 events
+        local elines
+        elines="$(awk -F'\t' 'NR > 1 && NF >= 3' "$events_source" 2>/dev/null | tail -5)"
+        while IFS=$'\t' read -r ets etype edesc esource; do
+            [[ -z "$ets" ]] && continue
+            [[ $efirst -eq 0 ]] && earr="$earr,"
+            earr="$earr{\"timestamp\":\"$(_json_esc "$ets")\",\"type\":\"$(_json_esc "${etype:-event}")\",\"description\":\"$(_json_esc "${edesc:-}")\",\"source\":\"$(_json_esc "${esource:-system}")\"}"
+            efirst=0
+        done <<< "$elines"
+        earr="$earr]"
+        events_json="$earr"
+    fi
+
+    # ── Build events_summary (string array for backward compat) ──────────────
+    local events_summary_json="[]"
+    if [[ -n "$events_source" ]]; then
+        local sarr="["
+        local sfirst=1
+        local slines
+        slines="$(awk -F'\t' 'NR > 1 && NF >= 3 { print $3 }' "$events_source" 2>/dev/null | tail -3)"
+        while IFS= read -r sline; do
+            [[ -z "$sline" ]] && continue
+            [[ $sfirst -eq 0 ]] && sarr="$sarr,"
+            sarr="$sarr\"$(_json_esc "$sline")\""
+            sfirst=0
+        done <<< "$slines"
+        sarr="$sarr]"
+        events_summary_json="$sarr"
+    fi
+
+    # ── git summary ──────────────────────────────────────────────────────────
+    local git_branch="" git_recent_commits=0 git_files_changed=0 git_insertions=0 git_deletions=0
+    if git -C "$project" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        git_branch="$(git -C "$project" branch --show-current 2>/dev/null || echo "")"
+        git_recent_commits="$(git -C "$project" log --oneline --since='24 hours ago' 2>/dev/null | wc -l | tr -d ' ')"
+        local gstat
+        gstat="$(git -C "$project" diff --stat 2>/dev/null | tail -1)"
+        if [[ -n "$gstat" ]]; then
+            git_files_changed="$(printf '%s' "$gstat" | sed -n 's/[[:space:]]*\([0-9][0-9]*\) file.*/\1/p' || echo 0)"
+            git_insertions="$(printf '%s' "$gstat" | sed -n 's/.*\([0-9][0-9]*\) insertion.*/\1/p' || echo 0)"
+            git_deletions="$(printf '%s' "$gstat" | sed -n 's/.*\([0-9][0-9]*\) deletion.*/\1/p' || echo 0)"
+        fi
+    fi
+    [[ -n "$git_files_changed" ]] || git_files_changed=0
+    [[ -n "$git_insertions" ]] || git_insertions=0
+    [[ -n "$git_deletions" ]] || git_deletions=0
+    [[ -n "$git_recent_commits" ]] || git_recent_commits=0
+
+    # ── recovery (absence summary) ───────────────────────────────────────────
+    local recovery_json=""
+    recovery_json="$(collector_absence_summary "$project" 2>/dev/null || echo "")"
+
     # ── Assemble final JSON ───────────────────────────────────────────────────
+    local recovery_field=""
+    if [[ -n "$recovery_json" ]]; then
+        recovery_field="$(printf ',\n  "recovery": %s' "$recovery_json")"
+    fi
+
     local json
     json="$(printf '{
   "mission": {
     "title": "%s",
     "status": "active"
   },
+  "fireState": "%s",
+  "fireLabel": "%s",
+  "nextAction": "%s",
   "projects": [
     {
       "name": "%s",
@@ -1096,17 +1199,39 @@ cmd_export() {
       "participant_count": %s
     }
   ],
+  "participants": %s,
+  "events": %s,
+  "events_summary": %s,
   "last_session": "%s",
-  "events_summary": %s
+  "lastActivity": "%s",
+  "gitSummary": {
+    "branch": "%s",
+    "recentCommits": %s,
+    "filesChanged": %s,
+    "insertions": %s,
+    "deletions": %s
+  }%s
 }' \
         "$(_json_esc "$mission_title")" \
+        "$(_json_esc "$fire_state")" \
+        "$(_json_esc "$fire_label")" \
+        "$(_json_esc "$next_action")" \
         "$(_json_esc "$project_name")" \
         "$(_json_esc "$animal")" \
         "$(_json_esc "$fire_state")" \
         "$(_json_esc "$last_activity")" \
         "$participant_count" \
+        "$participants_json" \
+        "$events_json" \
+        "$events_summary_json" \
         "$(_json_esc "$last_session")" \
-        "$events_json")"
+        "$(_json_esc "$last_activity")" \
+        "$(_json_esc "$git_branch")" \
+        "$git_recent_commits" \
+        "$git_files_changed" \
+        "$git_insertions" \
+        "$git_deletions" \
+        "$recovery_field")"
 
     # ── Write to camp.json for Phaser client ─────────────────────────────────
     local camp_json_path="$camp_d/camp.json"
@@ -1512,6 +1637,90 @@ _deprecated() {
 }
 
 # ============================================================
+# First-run guided flow for a new project
+# ============================================================
+
+first_run_flow() {
+    local project_root="$PWD"
+    local project_name
+    project_name="$(basename "$project_root")"
+
+    printf '\n'
+    printf '  \033[33m◎\033[0m  이 프로젝트를 캠프에 등록할게요: %s\n' "$project_name"
+    printf '\n'
+
+    # 1. Auto-init the project
+    cmd_init "$project_root"
+
+    # 2. Auto-populate status.md from git state
+    _first_run_populate_status "$project_root"
+
+    # 3. Prompt for mission
+    printf '\n'
+    printf '  지금 이 프로젝트에서 하고 있는 일이 뭔가요?\n'
+    printf '  > '
+    local mission_title=""
+    read -r mission_title
+    if [[ -n "$mission_title" ]]; then
+        camp_set_mission "$project_root" "$mission_title"
+        info "mission set: $mission_title"
+    fi
+
+    # 4. Record first-run event
+    collector_record_event "$project_root" "first_run" "Project $project_name registered in campsite" "user" 2>/dev/null || true
+
+    # 5. Show status
+    cmd_status
+
+    printf '\n'
+    printf '  \033[32m◎\033[0m  준비 완료! campsite 를 다시 실행하면 에이전트를 선택할 수 있어요.\n'
+    printf '     campsite camp serve 로 대시보드를 열 수 있어요.\n'
+    printf '\n'
+}
+
+_first_run_populate_status() {
+    local project_root="$1"
+    local status_file="$project_root/status.md"
+
+    # Only populate if status.md is a template (contains "project-name" placeholder)
+    [[ -f "$status_file" ]] || return 0
+    grep -q 'project-name' "$status_file" 2>/dev/null || return 0
+
+    local branch current_phase
+    branch="$(git -C "$project_root" branch --show-current 2>/dev/null || echo "main")"
+    current_phase="building"
+
+    local recent_work=""
+    if git -C "$project_root" log --oneline -5 2>/dev/null | head -5 > /dev/null 2>&1; then
+        recent_work="$(git -C "$project_root" log --oneline -5 2>/dev/null | head -5)"
+    fi
+
+    local project_name
+    project_name="$(basename "$project_root")"
+    local today
+    today="$(today_date)"
+
+    cat > "$status_file" <<EOF
+# Status — $project_name
+
+- phase: $current_phase
+- confidence: medium
+- last-updated: $today
+- last-agent: none
+- last-device: $(detect_device 2>/dev/null || echo "unknown")
+- branch: $branch
+
+## Recent work
+
+$(if [[ -n "$recent_work" ]]; then printf '%s' "$recent_work"; else printf 'No recent commits.'; fi)
+
+## Current state
+
+Project registered in campsite. Ready to start.
+EOF
+}
+
+# ============================================================
 # Main
 # ============================================================
 
@@ -1525,6 +1734,11 @@ main() {
                 printf '     \033[2m어렵지 않아요. 1분이면 됩니다.\033[0m\n'
                 printf '\n'
                 cmd_setup "$@"
+                return $?
+            fi
+            # Project-level first-run: auto-init if in a git repo without .campsite/
+            if [[ ! -d ".campsite" ]] && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+                first_run_flow
                 return $?
             fi
             cmd_launcher

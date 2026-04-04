@@ -1,4 +1,5 @@
 import { getRelativeTime } from '../systems/Narrative';
+import { EventEntry as StateEventEntry } from '../systems/StateLoader';
 
 /**
  * Event entry with a timestamp and description.
@@ -33,8 +34,7 @@ export class EventFeed {
   }
 
   /**
-   * Update the feed with event descriptions.
-   * Accepts either simple strings (from events_summary) or EventEntry objects.
+   * Update the feed with event descriptions (backward compat).
    */
   updateFromStrings(events: string[]): void {
     this.listEl.innerHTML = '';
@@ -43,7 +43,7 @@ export class EventFeed {
     if (display.length === 0) {
       const empty = document.createElement('li');
       empty.className = 'event-feed__item';
-      empty.innerHTML = '<span class="event-feed__desc" style="color:var(--text-hint)">아직 기록된 이벤트가 없어요</span>';
+      empty.innerHTML = '<span class="event-feed__desc" style="color:var(--text-hint)">아직 기록된 ���벤트가 없어요</span>';
       this.listEl.appendChild(empty);
       return;
     }
@@ -68,6 +68,37 @@ export class EventFeed {
     this.listEl.innerHTML = '';
 
     const display = events.slice(0, 5);
+    if (display.length === 0) {
+      this.updateFromStrings([]);
+      return;
+    }
+
+    for (const event of display) {
+      const li = document.createElement('li');
+      li.className = 'event-feed__item';
+
+      const timeSpan = document.createElement('span');
+      timeSpan.className = 'event-feed__time';
+      timeSpan.textContent = getRelativeTime(event.timestamp);
+
+      const descSpan = document.createElement('span');
+      descSpan.className = 'event-feed__desc';
+      descSpan.textContent = event.description;
+
+      li.appendChild(timeSpan);
+      li.appendChild(descSpan);
+      this.listEl.appendChild(li);
+    }
+  }
+
+  /**
+   * Update with structured collector events (preferred for live data).
+   */
+  updateFromStateEvents(events: StateEventEntry[]): void {
+    this.listEl.innerHTML = '';
+
+    // Show most recent first, limit to 5
+    const display = [...events].reverse().slice(0, 5);
     if (display.length === 0) {
       this.updateFromStrings([]);
       return;

@@ -2,6 +2,8 @@
  * Narrative.ts — Korean-language time and event formatting utilities.
  */
 
+import { RecoveryData } from './StateLoader';
+
 /**
  * Returns a Korean relative time string for a given ISO timestamp.
  *
@@ -42,4 +44,51 @@ export function formatEventsSummary(events: string[], limit = 3): string[] {
     .map(e => e.trim())
     .filter(e => e.length > 0)
     .slice(0, limit);
+}
+
+/**
+ * Formats a Korean human-readable absence summary from recovery data.
+ *
+ * Examples:
+ *   "3시간 동안 claude가 5개 커밋을 만들었어요"
+ *   "1일 동안 2개 이벤트가 있었어요"
+ */
+export function formatAbsenceSummary(recovery: RecoveryData): string {
+  const parts: string[] = [];
+
+  if (recovery.lastAgent && recovery.commitsDuringAbsence > 0) {
+    parts.push(
+      `${recovery.absenceHuman} 동안 ${recovery.lastAgent}가 ${recovery.commitsDuringAbsence}개 커밋을 만들었어요`,
+    );
+  } else if (recovery.commitsDuringAbsence > 0) {
+    parts.push(
+      `${recovery.absenceHuman} 동안 ${recovery.commitsDuringAbsence}개 커밋이 있었어요`,
+    );
+  } else if (recovery.eventsDuringAbsence > 0) {
+    parts.push(
+      `${recovery.absenceHuman} 동안 ${recovery.eventsDuringAbsence}개 이벤트가 있었어요`,
+    );
+  } else {
+    parts.push(`${recovery.absenceHuman} 동안 조용했어요`);
+  }
+
+  if (recovery.lastAgent && recovery.lastAgentStatus) {
+    const statusLabel = recovery.lastAgentStatus === 'finished' ? '정상 종료' :
+      recovery.lastAgentStatus === 'crashed' ? '오류 발생' :
+      recovery.lastAgentStatus === 'running' ? '아직 실행 중' :
+      recovery.lastAgentStatus;
+    parts.push(`${recovery.lastAgent}: ${statusLabel}`);
+  }
+
+  return parts.join('. ');
+}
+
+/**
+ * Formats seconds into Korean relative time (for absence durations).
+ */
+export function formatDurationKo(seconds: number): string {
+  if (seconds < 60) return '방금';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}분`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}시간`;
+  return `${Math.floor(seconds / 86400)}일`;
 }

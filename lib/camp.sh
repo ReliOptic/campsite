@@ -231,8 +231,16 @@ last-agent: $(field_value "$project_root/status.md" "last-agent" 2>/dev/null || 
 last-device: $(field_value "$project_root/status.md" "last-device" 2>/dev/null || echo "")
 EOF
 
-    camp_participant_upsert "$project_root" "$participant_id" "$tool" "agent" "$tool" "$terminal" "modakbul" "$summary" "" "$next_action" "25"
-    camp_event_append "$project_root" "$participant_id" "" "modakbul" "${tool} started in ${terminal:-terminal}."
+    local derived_state
+    derived_state="$(firestate_derive "$project_root" 2>/dev/null || echo "bulssi")"
+
+    camp_participant_upsert "$project_root" "$participant_id" "$tool" "agent" "$tool" "$terminal" "$derived_state" "$summary" "" "$next_action" "25"
+    camp_event_append "$project_root" "$participant_id" "" "$derived_state" "${tool} started in ${terminal:-terminal}."
+
+    # Signal collection
+    collector_record_event "$project_root" "session_start" "${tool} session started in ${terminal:-terminal}" "$tool" 2>/dev/null || true
+    collector_git_snapshot "$project_root" 2>/dev/null || true
+
     printf '%s' "$participant_id"
 }
 
@@ -280,13 +288,18 @@ camp_session_finish() {
         new_summary="${stored_tool} finished with changes: ${changes}Review the handoff."
         blocker=""
     else
-        new_state="jangjak"
+        new_state="$(firestate_derive "$project_root" 2>/dev/null || echo "jangjak")"
         new_summary="${stored_tool} session ended. No state updates. Ready to resume from ${terminal:-terminal}."
         blocker=""
     fi
 
     camp_participant_upsert "$project_root" "$participant_id" "$name" "$ptype" "$stored_tool" "$terminal" "$new_state" "$new_summary" "$blocker" "$next_action" "$priority"
     camp_event_append "$project_root" "$participant_id" "$old_state" "$new_state" "$new_summary"
+
+    # Signal collection
+    collector_record_event "$project_root" "session_end" "${stored_tool} session ended (${outcome})" "$stored_tool" 2>/dev/null || true
+    collector_git_snapshot "$project_root" 2>/dev/null || true
+
     rm -f "$snapshot_file" 2>/dev/null || true
 }
 
@@ -920,6 +933,10 @@ camp_render_phaser_serve() {
     phaser_dir="$(dirname "$html_path")"
     local camp_d
     camp_d="$(camp_dir "$project_root")"
+
+    # Refresh signals before serving
+    collector_git_snapshot "$project_root" 2>/dev/null || true
+    collector_file_activity "$project_root" 2>/dev/null || true
 
     # Symlink / copy camp.json into phaser dir so the HTTP server exposes it.
     cp "$camp_d/camp.json" "$phaser_dir/camp.json" 2>/dev/null || true
