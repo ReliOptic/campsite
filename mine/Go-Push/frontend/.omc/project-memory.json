@@ -1,0 +1,264 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1775322441284,
+  "projectRoot": "/Users/reliqbit_mac/projects/mine/Go-Push/frontend",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "next",
+        "version": "16.2.2",
+        "category": "fullstack"
+      },
+      {
+        "name": "react",
+        "version": "19.2.4",
+        "category": "frontend"
+      },
+      {
+        "name": "react-dom",
+        "version": "19.2.4",
+        "category": "frontend"
+      },
+      {
+        "name": "vitest",
+        "version": "4.1.2",
+        "category": "testing"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "npm run build",
+    "testCommand": null,
+    "lintCommand": "npm run lint",
+    "devCommand": "npm run dev",
+    "scripts": {
+      "dev": "next dev",
+      "build": "next build",
+      "start": "next start",
+      "lint": "eslint"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": "type-based"
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "public",
+      "src",
+      "tests"
+    ],
+    "gitBranches": {
+      "defaultBranch": "master",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "public": {
+      "path": "public",
+      "purpose": "Public files",
+      "fileCount": 5,
+      "lastAccessed": 1775322441274,
+      "keyFiles": [
+        "file.svg",
+        "globe.svg",
+        "next.svg",
+        "vercel.svg",
+        "window.svg"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1775322441274,
+      "keyFiles": []
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 1,
+      "lastAccessed": 1775322441275,
+      "keyFiles": [
+        "setup.ts"
+      ]
+    },
+    "src/app": {
+      "path": "src/app",
+      "purpose": "Application code",
+      "fileCount": 4,
+      "lastAccessed": 1775322441276,
+      "keyFiles": [
+        "favicon.ico",
+        "globals.css",
+        "layout.tsx"
+      ]
+    },
+    "src/components": {
+      "path": "src/components",
+      "purpose": "UI components",
+      "fileCount": 0,
+      "lastAccessed": 1775322441276,
+      "keyFiles": []
+    },
+    "src/config": {
+      "path": "src/config",
+      "purpose": "Configuration files",
+      "fileCount": 2,
+      "lastAccessed": 1775322441277,
+      "keyFiles": [
+        "index.ts",
+        "theme.ts"
+      ]
+    },
+    "src/lib": {
+      "path": "src/lib",
+      "purpose": "Library code",
+      "fileCount": 0,
+      "lastAccessed": 1775322441277,
+      "keyFiles": []
+    },
+    "src/types": {
+      "path": "src/types",
+      "purpose": "Type definitions",
+      "fileCount": 3,
+      "lastAccessed": 1775322441277,
+      "keyFiles": [
+        "boss.types.ts",
+        "identity.types.ts",
+        "onboarding.types.ts"
+      ]
+    },
+    "src/utils": {
+      "path": "src/utils",
+      "purpose": "Utility functions",
+      "fileCount": 0,
+      "lastAccessed": 1775322441277,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "src/components/onboarding/micro-action.tsx",
+      "accessCount": 8,
+      "lastAccessed": 1775322501617,
+      "type": "file"
+    },
+    {
+      "path": "src/components/onboarding/reveal.tsx",
+      "accessCount": 8,
+      "lastAccessed": 1775322601317,
+      "type": "file"
+    },
+    {
+      "path": "src/components/onboarding/scene-picker.tsx",
+      "accessCount": 6,
+      "lastAccessed": 1775322606339,
+      "type": "file"
+    },
+    {
+      "path": "src/components/onboarding/weight-picker.tsx",
+      "accessCount": 5,
+      "lastAccessed": 1775322532834,
+      "type": "file"
+    },
+    {
+      "path": "src/components/onboarding/vibe-picker.tsx",
+      "accessCount": 3,
+      "lastAccessed": 1775322511977,
+      "type": "file"
+    },
+    {
+      "path": "src/components/ui/orb.tsx",
+      "accessCount": 3,
+      "lastAccessed": 1775322559977,
+      "type": "file"
+    },
+    {
+      "path": "src/components/scenes/ambient-scene.tsx",
+      "accessCount": 3,
+      "lastAccessed": 1775322623837,
+      "type": "file"
+    },
+    {
+      "path": "tests/unit/onboarding-store.test.ts",
+      "accessCount": 3,
+      "lastAccessed": 1775322779134,
+      "type": "file"
+    },
+    {
+      "path": "src/stores/onboarding-store.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775322628006,
+      "type": "file"
+    },
+    {
+      "path": "src/types/boss.types.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775322628149,
+      "type": "file"
+    },
+    {
+      "path": "src/types/identity.types.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775322628547,
+      "type": "file"
+    },
+    {
+      "path": "src/types/onboarding.types.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775322628939,
+      "type": "file"
+    },
+    {
+      "path": "tests/unit/fallback-identity.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775322684877,
+      "type": "file"
+    },
+    {
+      "path": "tests/unit/micro-action.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775322706519,
+      "type": "file"
+    },
+    {
+      "path": "tests/unit/reveal.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775322725374,
+      "type": "file"
+    },
+    {
+      "path": "tests/setup.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775322770083,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

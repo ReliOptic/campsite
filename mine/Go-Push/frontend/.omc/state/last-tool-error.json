@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"npx vitest run 2>&1\",\"timeout\":60000,\"description\":\"Run vitest test suite\"}",
+  "error": "Exit code 1\n\n RUN  v4.1.2 /Users/reliqbit_mac/projects/mine/Go-Push/frontend\n\n(node:58583) Warning: `--localstorage-file` was provided without a valid path\n(Use `node --trace-warnings ...` to show where the warning was created)\n ❯ tests/unit/onboarding-store.test.ts (12 tests | 12 failed) 4ms\n     × starts at step 1 with null signals 2ms\n     × setVibe updates signals.vibe 0ms\n     × setWeight updates signals.weight 0ms\n     × setScene updates signals.scene 0ms\n     × setMicroAction updates sign...",
+  "timestamp": "2026-04-04T17:12:35.949Z",
+  "retry_count": 2
+}
