@@ -98,6 +98,39 @@ install_files() {
         printf 'dev\n' > "$CAMPSITE_HOME/VERSION"
     fi
 
+    # ── Phaser camp-client (optional, requires node/npm) ──────────────────────
+    # When camp-client/dist/ is already present in the source (e.g. pre-built
+    # release tarball or a git clone where `npm run build` has already been run),
+    # copy it directly.  Otherwise attempt to build from source if node is
+    # available.  A warning is printed if building is not possible — the CLI
+    # still works using the legacy HTML renderer.
+    #
+    # Future: a GitHub Releases tarball download path can replace the build step
+    # here by fetching a pre-built dist/ archive and extracting it directly.
+    local phaser_dest="$CAMPSITE_HOME/camp-client/dist"
+    if [[ -d "$src/camp-client/dist" ]]; then
+        dim "  copying pre-built Phaser dist..."
+        mkdir -p "$CAMPSITE_HOME/camp-client"
+        cp -r "$src/camp-client/dist" "$CAMPSITE_HOME/camp-client/dist"
+        dim "  Phaser storyworld renderer installed"
+    elif [[ -d "$src/camp-client" ]] && command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+        dim "  building Phaser camp-client (node $(node --version))..."
+        (
+            cd "$src/camp-client" \
+            && npm install --silent 2>/dev/null \
+            && npm run build 2>/dev/null
+        ) && {
+            mkdir -p "$CAMPSITE_HOME/camp-client"
+            cp -r "$src/camp-client/dist" "$CAMPSITE_HOME/camp-client/dist"
+            dim "  Phaser storyworld renderer installed"
+        } || {
+            printf '\033[33m  warning: Phaser client build failed — using legacy HTML renderer\033[0m\n'
+        }
+    else
+        printf '\033[33m  note: node/npm not found — skipping Phaser build (legacy HTML renderer will be used)\033[0m\n'
+        printf '\033[2m  To enable the Phaser storyworld later: cd %s/camp-client && npm install && npm run build\033[0m\n' "$src"
+    fi
+
     # Create user config if not exists
     if [[ ! -f "$CAMPSITE_HOME/user/config.sh" ]]; then
         cat > "$CAMPSITE_HOME/user/config.sh" <<'USERCONF'

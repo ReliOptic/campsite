@@ -66,8 +66,14 @@ usage:
   campsite recover        Clear orphaned locks + stale files
   campsite dashboard      All projects overview
   campsite camp           Camp state commands and local recovery-first scene
+  campsite camp render    Render camp in browser (Phaser storyworld when built, legacy HTML otherwise)
+  campsite camp render --legacy   Force legacy HTML renderer
   campsite camp serve     Live camp server with auto-refresh (http://localhost:8470)
+  campsite camp serve --legacy    Force legacy HTML server
   campsite workspace set <path>   Set workspace root
+
+  campsite export         Export camp state as JSON to stdout (also writes .campsite/camp/camp.json)
+  campsite export --json  Same as above (explicit flag)
 
   campsite --version      Print version
   campsite help           Show this message
@@ -686,16 +692,28 @@ cmd_camp() {
         render)
             local no_open=0
             local print_path=0
+            local legacy=0
             for arg in "$@"; do
                 case "$arg" in
-                    --no-open) no_open=1 ;;
+                    --no-open)    no_open=1 ;;
                     --print-path) print_path=1 ;;
-                    *) fail "unknown flag for campsite camp render: $arg" "Valid flags: --no-open, --print-path" ;;
+                    --legacy)     legacy=1 ;;
+                    *) fail "unknown flag for campsite camp render: $arg" "Valid flags: --no-open, --print-path, --legacy" ;;
                 esac
             done
 
             local html_path
-            html_path="$(camp_render "$project")"
+            # Use Phaser renderer when dist exists and --legacy not requested.
+            local _phaser_dist
+            _phaser_dist="$(camp_phaser_dist_dir 2>/dev/null)" || _phaser_dist=""
+            if [[ $legacy -eq 0 && -n "$_phaser_dist" ]]; then
+                if ! html_path="$(camp_render_phaser "$project" 2>&1)"; then
+                    warn "Phaser render failed — falling back to legacy renderer"
+                    html_path="$(camp_render "$project")"
+                fi
+            else
+                html_path="$(camp_render "$project")"
+            fi
 
             if [[ $print_path -eq 1 ]]; then
                 printf '%s\n' "$html_path"
@@ -716,59 +734,91 @@ cmd_camp() {
             ;;
         serve)
             local port="${CAMPSITE_SERVE_PORT:-8470}"
+            local legacy=0
             for arg in "$@"; do
                 case "$arg" in
                     --port=*) port="${arg#--port=}" ;;
-                    *) fail "unknown flag for campsite camp serve: $arg" "Valid flags: --port=N" ;;
+                    --legacy)  legacy=1 ;;
+                    *) fail "unknown flag for campsite camp serve: $arg" "Valid flags: --port=N, --legacy" ;;
                 esac
             done
 
-            # Render initial HTML
-            camp_render "$project" >/dev/null
+            local camp_d
+            camp_d="$(camp_dir "$project")"
 
-            local camp_dir
-            camp_dir="$(camp_dir "$project")"
-
-            # Copy exported design assets if available
-            if camp_assets_install "$project" 2>/dev/null; then
-                info "design assets installed to $camp_dir/assets/"
+            # Determine serve directory and render initial output
+            local serve_dir
+            local _phaser_dist_s
+            _phaser_dist_s="$(camp_phaser_dist_dir 2>/dev/null)" || _phaser_dist_s=""
+            if [[ $legacy -eq 0 && -n "$_phaser_dist_s" ]]; then
+                # Phaser path: copy dist + inject CAMP_STATE + get serve dir
+                if serve_dir="$(camp_render_phaser_serve "$project" 2>&1)"; then
+                    info "using Phaser storyworld renderer"
+                else
+                    warn "Phaser serve setup failed — falling back to legacy renderer"
+                    legacy=1
+                fi
             fi
 
-            # Generate camp-state.json for live polling
-            _camp_write_json "$project" "$camp_dir/camp-state.json"
+            if [[ $legacy -eq 1 || -z "${serve_dir:-}" ]]; then
+                # Legacy path
+                camp_render "$project" >/dev/null
 
-            # Inject live-reload script into rendered HTML
-            local html_path
-            html_path="$(camp_index_path "$project")"
-            if ! grep -q 'camp-live-poll' "$html_path" 2>/dev/null; then
-                _portable_sed_i 's|</body>|<script id="camp-live-poll">setInterval(async()=>{try{const r=await fetch("camp-state.json?t="+Date.now());if(!r.ok)return;const d=await r.json();document.getElementById("working-now").textContent=d.working_now;document.getElementById("waiting-on-you").textContent=d.waiting_on_you;document.getElementById("next-move").textContent=d.next_move;document.getElementById("camp-footer").textContent=d.participant_count+" participants in camp";if(d.participants){const sl={bulssi:"불씨",modakbul:"모닥불",deungbul:"등불",yeongi:"연기",jangjak:"장작"};const l=document.getElementById("participant-list");l.innerHTML="";d.participants.forEach(p=>{const e=document.createElement("div");e.className="participant";e.setAttribute("data-state",p.state);const lb=sl[p.state]||p.state;const ic=\x27<svg width="12" height="12"><use href="#ico-\x27+p.state+\x27"/></svg>\x27;let dt=\x27<span class="detail-label">Summary</span>\x27+esc(p.summary);if(p.blocker)dt+=\x27<span class="detail-label">Blocker</span><span class="detail-blocker">\x27+esc(p.blocker)+\x27</span>\x27;if(p.next)dt+=\x27<span class="detail-label">Next action</span><span class="detail-next">\x27+esc(p.next)+\x27</span>\x27;dt+=\x27<span class="detail-label">Resume</span><span class="detail-resume">\x27+esc(p.tool)+" in "+esc(p.terminal)+\x27</span>\x27;e.innerHTML=\x27<div class="participant-header"><span class="participant-name">\x27+esc(p.name)+\x27</span><span class="state-chip state-\x27+p.state+\x27">\x27+ic+lb+\x27</span></div><div class="participant-detail">\x27+dt+\x27</div>\x27;e.onclick=()=>{const dd=e.querySelector(".participant-detail");dd.style.display=dd.style.display==="block"?"none":"block"};l.appendChild(e)})}}catch(e){}},3000)</script></body>|' "$html_path"
+                # Copy exported design assets if available
+                if camp_assets_install "$project" 2>/dev/null; then
+                    info "design assets installed to $camp_d/assets/"
+                fi
+
+                # Generate camp-state.json for live polling
+                _camp_write_json "$project" "$camp_d/camp-state.json"
+
+                # Inject live-reload script into rendered HTML
+                local html_path_legacy
+                html_path_legacy="$(camp_index_path "$project")"
+                if ! grep -q 'camp-live-poll' "$html_path_legacy" 2>/dev/null; then
+                    _portable_sed_i 's|</body>|<script id="camp-live-poll">setInterval(async()=>{try{const r=await fetch("camp-state.json?t="+Date.now());if(!r.ok)return;const d=await r.json();document.getElementById("working-now").textContent=d.working_now;document.getElementById("waiting-on-you").textContent=d.waiting_on_you;document.getElementById("next-move").textContent=d.next_move;document.getElementById("camp-footer").textContent=d.participant_count+" participants in camp";if(d.participants){const sl={bulssi:"불씨",modakbul:"모닥불",deungbul:"등불",yeongi:"연기",jangjak:"장작"};const l=document.getElementById("participant-list");l.innerHTML="";d.participants.forEach(p=>{const e=document.createElement("div");e.className="participant";e.setAttribute("data-state",p.state);const lb=sl[p.state]||p.state;const ic=\x27<svg width="12" height="12"><use href="#ico-\x27+p.state+\x27"/></svg>\x27;let dt=\x27<span class="detail-label">Summary</span>\x27+esc(p.summary);if(p.blocker)dt+=\x27<span class="detail-label">Blocker</span><span class="detail-blocker">\x27+esc(p.blocker)+\x27</span>\x27;if(p.next)dt+=\x27<span class="detail-label">Next action</span><span class="detail-next">\x27+esc(p.next)+\x27</span>\x27;dt+=\x27<span class="detail-label">Resume</span><span class="detail-resume">\x27+esc(p.tool)+" in "+esc(p.terminal)+\x27</span>\x27;e.innerHTML=\x27<div class="participant-header"><span class="participant-name">\x27+esc(p.name)+\x27</span><span class="state-chip state-\x27+p.state+\x27">\x27+ic+lb+\x27</span></div><div class="participant-detail">\x27+dt+\x27</div>\x27;e.onclick=()=>{const dd=e.querySelector(".participant-detail");dd.style.display=dd.style.display==="block"?"none":"block"};l.appendChild(e)})}}catch(e){}},3000)</script></body>|' "$html_path_legacy"
+                fi
+
+                serve_dir="$camp_d"
             fi
 
             info "camp serving at http://localhost:${port}"
-            printf "  camp dir: %s\n" "$camp_dir"
+            printf "  serve dir: %s\n" "$serve_dir"
             printf "  press ctrl-c to stop\n\n"
 
             # Open browser
             camp_open_browser "http://localhost:${port}" 2>/dev/null || true
 
             # Watch for state changes and regenerate
-            (
-                while true; do
-                    sleep 3
-                    _camp_write_json "$project" "$camp_dir/camp-state.json" 2>/dev/null || true
-                done
-            ) &
+            if [[ $legacy -eq 0 && -n "$_phaser_dist_s" ]]; then
+                # Phaser: refresh camp.json in the serve dir every 3 seconds
+                (
+                    while true; do
+                        sleep 3
+                        cmd_export > /dev/null 2>&1 || true
+                        cp "$camp_d/camp.json" "$serve_dir/camp.json" 2>/dev/null || true
+                    done
+                ) &
+            else
+                # Legacy: refresh camp-state.json
+                (
+                    while true; do
+                        sleep 3
+                        _camp_write_json "$project" "$camp_d/camp-state.json" 2>/dev/null || true
+                    done
+                ) &
+            fi
             local watch_pid=$!
             trap "kill $watch_pid 2>/dev/null; exit 0" INT TERM
 
             # Serve via python
             if command -v python3 >/dev/null 2>&1; then
-                python3 -m http.server "$port" --directory "$camp_dir" 2>/dev/null
+                python3 -m http.server "$port" --directory "$serve_dir" 2>/dev/null
             elif command -v python >/dev/null 2>&1; then
-                cd "$camp_dir" && python -m SimpleHTTPServer "$port" 2>/dev/null
+                cd "$serve_dir" && python -m SimpleHTTPServer "$port" 2>/dev/null
             else
                 kill $watch_pid 2>/dev/null || true
-                fail "python not found — needed for camp serve" "Install python3 or open the HTML directly: $html_path"
+                fail "python not found — needed for camp serve" "Install python3 or open the HTML directly: $serve_dir/index.html"
             fi
             ;;
         overview)
@@ -882,16 +932,27 @@ cmd_camp() {
             set -- "$subcommand" "$@"
             local no_open=0
             local print_path=0
+            local legacy=0
             for arg in "$@"; do
                 case "$arg" in
-                    --no-open) no_open=1 ;;
+                    --no-open)    no_open=1 ;;
                     --print-path) print_path=1 ;;
+                    --legacy)     legacy=1 ;;
                     *) fail "unknown camp command: $subcommand" "Valid commands: render, serve, overview, mission, participant" ;;
                 esac
             done
 
             local html_path
-            html_path="$(camp_render "$project")"
+            local _phaser_dist_fb
+            _phaser_dist_fb="$(camp_phaser_dist_dir 2>/dev/null)" || _phaser_dist_fb=""
+            if [[ $legacy -eq 0 && -n "$_phaser_dist_fb" ]]; then
+                if ! html_path="$(camp_render_phaser "$project" 2>&1)"; then
+                    warn "Phaser render failed — falling back to legacy renderer"
+                    html_path="$(camp_render "$project")"
+                fi
+            else
+                html_path="$(camp_render "$project")"
+            fi
 
             if [[ $print_path -eq 1 ]]; then
                 printf '%s\n' "$html_path"
@@ -911,6 +972,148 @@ cmd_camp() {
             fi
             ;;
     esac
+}
+
+# --- campsite export [--json] ---
+cmd_export() {
+    local project
+    project="$(detect_project)"
+
+    local campsite_dir camp_d
+    campsite_dir="$(project_campsite_dir "$project")"
+    camp_d="$(camp_dir "$project")"
+
+    # ── mission.title ─────────────────────────────────────────────────────────
+    local mission_title=""
+    local mission_file="$camp_d/mission.meta"
+    if [[ -f "$mission_file" ]]; then
+        mission_title="$(camp_field_get "$mission_file" "title")"
+    fi
+    [[ -n "$mission_title" ]] || mission_title="(no mission set)"
+
+    # ── fire_state ────────────────────────────────────────────────────────────
+    local fire_state="bulssi"
+    local fire_state_file="$camp_d/fire-state"
+    if [[ -f "$fire_state_file" ]]; then
+        local raw_fire
+        raw_fire="$(tr -d '[:space:]' < "$fire_state_file" 2>/dev/null || true)"
+        [[ -n "$raw_fire" ]] && fire_state="$raw_fire"
+    fi
+
+    # ── animal (from .campsite/project.meta, key animal=) ─────────────────────
+    local animal="fox"
+    local project_meta_file="$campsite_dir/project.meta"
+    if [[ -f "$project_meta_file" ]]; then
+        local raw_animal
+        raw_animal="$(grep '^animal=' "$project_meta_file" 2>/dev/null | head -1 | sed 's/^animal=//' | tr -d '[:space:]')"
+        [[ -n "$raw_animal" ]] && animal="$raw_animal"
+    fi
+
+    # ── last_activity (mtime of last events.tsv row) ─────────────────────────
+    local last_activity=""
+    local events_file="$camp_d/events.tsv"
+    if [[ -f "$events_file" ]]; then
+        # The first field of non-header rows is the ISO timestamp.
+        last_activity="$(awk -F'\t' 'NR > 1 && $1 != "" { ts = $1 } END { print ts }' "$events_file" 2>/dev/null || true)"
+    fi
+    [[ -n "$last_activity" ]] || last_activity="$(now_iso)"
+
+    # ── participant_count ─────────────────────────────────────────────────────
+    local participant_count=0
+    local participants_file="$camp_d/participants.tsv"
+    if [[ -f "$participants_file" ]]; then
+        participant_count="$(awk 'NR > 1 { count++ } END { print count + 0 }' "$participants_file" 2>/dev/null || echo 0)"
+    fi
+
+    # ── last_session ──────────────────────────────────────────────────────────
+    local last_session=""
+    local last_session_file="$camp_d/last-session"
+    if [[ -f "$last_session_file" ]]; then
+        last_session="$(tr -d '[:space:]' < "$last_session_file" 2>/dev/null || true)"
+    fi
+    [[ -n "$last_session" ]] || last_session="$(now_iso)"
+
+    # ── events_summary (last 3 summary fields from events.tsv) ───────────────
+    # events.tsv columns: created_at  participant_id  from_state  to_state  summary
+    local ev1="" ev2="" ev3=""
+    if [[ -f "$events_file" ]]; then
+        local ev_lines
+        ev_lines="$(awk -F'\t' 'NR > 1 && $5 != "" { print $5 }' "$events_file" 2>/dev/null | tail -3)"
+        local ev_count=0
+        while IFS= read -r line; do
+            ev_count=$((ev_count + 1))
+            case $ev_count in
+                1) ev1="$line" ;;
+                2) ev2="$line" ;;
+                3) ev3="$line" ;;
+            esac
+        done <<< "$ev_lines"
+    fi
+
+    # ── JSON escape helper ────────────────────────────────────────────────────
+    # Escapes backslash, double-quote, and common control chars; bash 3.2 safe.
+    _json_esc() {
+        printf '%s' "$1" \
+            | sed \
+                -e 's/\\/\\\\/g' \
+                -e 's/"/\\"/g' \
+                -e 's/	/\\t/g'
+    }
+
+    # ── project name ─────────────────────────────────────────────────────────
+    local project_name
+    project_name="$(basename "$project")"
+
+    # ── Build events_summary JSON array ──────────────────────────────────────
+    local events_json="[]"
+    if [[ -n "$ev1" || -n "$ev2" || -n "$ev3" ]]; then
+        local arr="["
+        local first=1
+        local ev
+        for ev in "$ev1" "$ev2" "$ev3"; do
+            [[ -z "$ev" ]] && continue
+            [[ $first -eq 0 ]] && arr="$arr,"
+            arr="$arr\"$(_json_esc "$ev")\""
+            first=0
+        done
+        arr="$arr]"
+        events_json="$arr"
+    fi
+
+    # ── Assemble final JSON ───────────────────────────────────────────────────
+    local json
+    json="$(printf '{
+  "mission": {
+    "title": "%s",
+    "status": "active"
+  },
+  "projects": [
+    {
+      "name": "%s",
+      "animal": "%s",
+      "fire_state": "%s",
+      "last_activity": "%s",
+      "participant_count": %s
+    }
+  ],
+  "last_session": "%s",
+  "events_summary": %s
+}' \
+        "$(_json_esc "$mission_title")" \
+        "$(_json_esc "$project_name")" \
+        "$(_json_esc "$animal")" \
+        "$(_json_esc "$fire_state")" \
+        "$(_json_esc "$last_activity")" \
+        "$participant_count" \
+        "$(_json_esc "$last_session")" \
+        "$events_json")"
+
+    # ── Write to camp.json for Phaser client ─────────────────────────────────
+    local camp_json_path="$camp_d/camp.json"
+    printf '%s\n' "$json" > "$camp_json_path"
+
+    # ── Print to stdout ───────────────────────────────────────────────────────
+    printf '%s\n' "$json"
 }
 
 # --- campsite setup helpers ---
@@ -1358,6 +1561,17 @@ main() {
             ;;
         camp)
             shift; cmd_camp "$@"
+            ;;
+        export)
+            shift
+            # Accept optional --json flag (makes the intent explicit; behaviour is identical)
+            for _exp_arg in "$@"; do
+                case "$_exp_arg" in
+                    --json) ;;
+                    *) fail "unknown flag for campsite export: $_exp_arg" "Valid flags: --json" ;;
+                esac
+            done
+            cmd_export
             ;;
         workspace)
             shift

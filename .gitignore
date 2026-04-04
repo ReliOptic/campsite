@@ -28,3 +28,11 @@ GEMINI.md
 
 # Claude Code local config
 .claude/
+
+# Node
+node_modules/
+camp-client/node_modules/
+camp-client/dist/
+
+# OMC
+.omc/

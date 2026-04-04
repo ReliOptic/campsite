@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fire Icons — Visual Test</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a1a;
+    color: #ccc;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 24px;
+    gap: 48px;
+  }
+  h1 { color: #ffaa00; font-size: 18px; letter-spacing: 2px; text-transform: uppercase; }
+  h2 { color: #888; font-size: 13px; margin-bottom: 12px; }
+  .row {
+    display: flex;
+    gap: 40px;
+    align-items: flex-end;
+  }
+  .icon-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .icon-card .label {
+    font-size: 11px;
+    color: #666;
+    text-align: center;
+  }
+  .icon-card .label .ko {
+    color: #999;
+    font-size: 13px;
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  /* animations */
+  .fire-bulssi {
+    animation: fire-bulssi-flicker 2s ease-in-out infinite;
+  }
+  @keyframes fire-bulssi-flicker {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+  .fire-modakbul {
+    animation: fire-modakbul-pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes fire-modakbul-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(0.95); }
+  }
+  .fire-deungbul {
+    animation: fire-deungbul-glow 3s ease-in-out infinite;
+  }
+  @keyframes fire-deungbul-glow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.9; }
+  }
+  .fire-yeongi {
+    animation: fire-yeongi-drift 4s ease-in-out infinite;
+  }
+  @keyframes fire-yeongi-drift {
+    0%, 100% { transform: translateY(0); opacity: 0.7; }
+    50% { transform: translateY(-2px); opacity: 0.5; }
+  }
+  .fire-jangjak {
+    /* static */
+  }
+</style>
+</head>
+<body>
+
+<h1>Campsite Fire Icons</h1>
+
+<!-- 64x64 -->
+<h2>64 x 64</h2>
+<div class="row">
+
+  <div class="icon-card">
+    <div class="fire-bulssi" style="width:64px;height:64px;">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges"><rect x="15" y="22" width="2" height="1" fill="#ff6600"/><rect x="15" y="20" width="2" height="2" fill="#ff8800"/><rect x="15" y="18" width="2" height="2" fill="#ffaa00"/><rect x="16" y="16" width="1" height="2" fill="#ffaa00"/><rect x="16" y="15" width="1" height="1" fill="#ffaa00" opacity="0.8"/></svg>
+    </div>
+    <div class="label"><span class="ko">불씨</span>bulssi</div>
+  </div>
+
+  <div class="icon-card">
+    <div class="fire-modakbul" style="width:64px;height:64px;">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges"><rect x="10" y="27" width="12" height="2" fill="#8a6633"/><rect x="9" y="29" width="14" height="2" fill="#aa7744"/><rect x="11" y="31" width="10" height="1" fill="#cc8844"/><rect x="12" y="24" width="8" height="3" fill="#ff3300"/><rect x="11" y="23" width="10" height="2" fill="#ff6600"/><rect x="12" y="18" width="2" height="5" fill="#ff6600"/><rect x="12" y="15" width="2" height="3" fill="#ffaa00"/><rect x="13" y="13" width="1" height="2" fill="#ffdd44"/><rect x="14" y="16" width="4" height="7" fill="#ff6600"/><rect x="15" y="12" width="2" height="4" fill="#ffaa00"/><rect x="15" y="9" width="2" height="3" fill="#ffdd44"/><rect x="16" y="7" width="1" height="2" fill="#ffdd44" opacity="0.9"/><rect x="18" y="18" width="2" height="5" fill="#ff6600"/><rect x="18" y="15" width="2" height="3" fill="#ffaa00"/><rect x="18" y="13" width="1" height="2" fill="#ffdd44"/><rect x="14" y="6" width="1" height="1" fill="#ffdd44" opacity="0.9"/><rect x="19" y="8" width="1" height="1" fill="#ffdd44" opacity="0.7"/><rect x="11" y="10" width="1" height="1" fill="#ffdd44" opacity="0.6"/></svg>
+    </div>
+    <div class="label"><span class="ko">모닥불</span>modakbul</div>
+  </div>
+
+  <div class="icon-card">
+    <div class="fire-deungbul" style="width:64px;height:64px;">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges"><rect x="14" y="5" width="4" height="1" fill="#8a6633"/><rect x="15" y="4" width="2" height="1" fill="#8a6633"/><rect x="12" y="6" width="8" height="1" fill="#aa7744"/><rect x="12" y="6" width="1" height="18" fill="#aa7744"/><rect x="19" y="6" width="1" height="18" fill="#aa7744"/><rect x="12" y="23" width="8" height="1" fill="#aa7744"/><rect x="13" y="7" width="6" height="16" fill="#ffdd88"/><rect x="14" y="9" width="4" height="12" fill="#ffcc66"/><rect x="15" y="11" width="2" height="8" fill="#ffdd88" opacity="0.9"/><rect x="11" y="24" width="10" height="1" fill="#8a6633"/><rect x="12" y="25" width="8" height="1" fill="#aa7744"/><rect x="10" y="10" width="1" height="1" fill="#ffdd88" opacity="0.4"/><rect x="10" y="16" width="1" height="1" fill="#ffdd88" opacity="0.3"/><rect x="21" y="12" width="1" height="1" fill="#ffdd88" opacity="0.4"/><rect x="21" y="18" width="1" height="1" fill="#ffdd88" opacity="0.3"/><rect x="9" y="13" width="1" height="1" fill="#ffdd88" opacity="0.2"/><rect x="22" y="15" width="1" height="1" fill="#ffdd88" opacity="0.2"/></svg>
+    </div>
+    <div class="label"><span class="ko">등불</span>deungbul</div>
+  </div>
+
+  <div class="icon-card">
+    <div class="fire-yeongi" style="width:64px;height:64px;">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges"><rect x="14" y="27" width="4" height="2" fill="#553333"/><rect x="15" y="26" width="2" height="1" fill="#553333" opacity="0.7"/><rect x="13" y="23" width="1" height="1" fill="#666666"/><rect x="12" y="21" width="1" height="1" fill="#666666" opacity="0.9"/><rect x="13" y="19" width="1" height="1" fill="#888888"/><rect x="12" y="17" width="1" height="1" fill="#888888" opacity="0.8"/><rect x="13" y="15" width="1" height="1" fill="#aaaaaa" opacity="0.6"/><rect x="12" y="13" width="1" height="1" fill="#aaaaaa" opacity="0.4"/><rect x="15" y="24" width="1" height="1" fill="#666666"/><rect x="15" y="22" width="1" height="1" fill="#666666" opacity="0.9"/><rect x="14" y="20" width="1" height="1" fill="#888888"/><rect x="15" y="18" width="1" height="1" fill="#888888" opacity="0.7"/><rect x="14" y="16" width="1" height="1" fill="#aaaaaa" opacity="0.5"/><rect x="15" y="14" width="1" height="1" fill="#aaaaaa" opacity="0.3"/><rect x="17" y="24" width="1" height="1" fill="#666666"/><rect x="17" y="22" width="1" height="1" fill="#888888"/><rect x="18" y="20" width="1" height="1" fill="#888888" opacity="0.8"/><rect x="17" y="18" width="1" height="1" fill="#aaaaaa" opacity="0.6"/><rect x="18" y="16" width="1" height="1" fill="#aaaaaa" opacity="0.4"/><rect x="19" y="23" width="1" height="1" fill="#666666" opacity="0.8"/><rect x="20" y="21" width="1" height="1" fill="#888888" opacity="0.7"/><rect x="19" y="19" width="1" height="1" fill="#888888" opacity="0.5"/><rect x="20" y="17" width="1" height="1" fill="#aaaaaa" opacity="0.4"/><rect x="19" y="15" width="1" height="1" fill="#aaaaaa" opacity="0.2"/></svg>
+    </div>
+    <div class="label"><span class="ko">연기</span>yeongi</div>
+  </div>
+
+  <div class="icon-card">
+    <div class="fire-jangjak" style="width:64px;height:64px;">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges"><rect x="7" y="26" width="18" height="3" fill="#8a6633"/><rect x="9" y="22" width="16" height="3" fill="#aa7744"/><rect x="8" y="18" width="17" height="3" fill="#cc8844"/><rect x="10" y="14" width="14" height="3" fill="#aa7744"/><rect x="10" y="27" width="1" height="1" fill="#cc8844" opacity="0.5"/><rect x="18" y="26" width="1" height="1" fill="#cc8844" opacity="0.4"/><rect x="12" y="23" width="1" height="1" fill="#cc8844" opacity="0.5"/><rect x="20" y="22" width="1" height="1" fill="#8a6633" opacity="0.6"/><rect x="11" y="19" width="1" height="1" fill="#8a6633" opacity="0.4"/><rect x="19" y="18" width="1" height="1" fill="#8a6633" opacity="0.5"/><rect x="14" y="15" width="1" height="1" fill="#cc8844" opacity="0.4"/><rect x="20" y="14" width="1" height="1" fill="#8a6633" opacity="0.5"/><rect x="16" y="11" width="1" height="1" fill="#ffaa00" opacity="0.5"/></svg>
+    </div>
+    <div class="label"><span class="ko">장작</span>jangjak</div>
+  </div>
+
+</div>
+
+<!-- 96x96 -->
+<h2>96 x 96</h2>
+<div class="row">
+
+  <div class="icon-card">
+    <div class="fire-bulssi" style="width:96px;height:96px;">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges"><rect x="15" y="22" width="2" height="1" fill="#ff6600"/><rect x="15" y="20" width="2" height="2" fill="#ff8800"/><rect x="15" y="18" width="2" height="2" fill="#ffaa00"/><rect x="16" y="16" width="1" height="2" fill="#ffaa00"/><rect x="16" y="15" width="1" height="1" fill="#ffaa00" opacity="0.8"/></svg>
+    </div>
+    <div class="label"><span class="ko">불씨</span>bulssi</div>
+  </div>
+
+  <div class="icon-card">
+    <div class="fire-modakbul" style="width:96px;height:96px;">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges"><rect x="10" y="27" width="12" height="2" fill="#8a6633"/><rect x="9" y="29" width="14" height="2" fill="#aa7744"/><rect x="11" y="31" width="10" height="1" fill="#cc8844"/><rect x="12" y="24" width="8" height="3" fill="#ff3300"/><rect x="11" y="23" width="10" height="2" fill="#ff6600"/><rect x="12" y="18" width="2" height="5" fill="#ff6600"/><rect x="12" y="15" width="2" height="3" fill="#ffaa00"/><rect x="13" y="13" width="1" height="2" fill="#ffdd44"/><rect x="14" y="16" width="4" height="7" fill="#ff6600"/><rect x="15" y="12" width="2" height="4" fill="#ffaa00"/><rect x="15" y="9" width="2" height="3" fill="#ffdd44"/><rect x="16" y="7" width="1" height="2" fill="#ffdd44" opacity="0.9"/><rect x="18" y="18" width="2" height="5" fill="#ff6600"/><rect x="18" y="15" width="2" height="3" fill="#ffaa00"/><rect x="18" y="13" width="1" height="2" fill="#ffdd44"/><rect x="14" y="6" width="1" height="1" fill="#ffdd44" opacity="0.9"/><rect x="19" y="8" width="1" height="1" fill="#ffdd44" opacity="0.7"/><rect x="11" y="10" width="1" height="1" fill="#ffdd44" opacity="0.6"/></svg>
+    </div>
+    <div class="label"><span class="ko">모닥불</span>modakbul</div>
+  </div>
+
+  <div class="icon-card">
+    <div class="fire-deungbul" style="width:96px;height:96px;">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges"><rect x="14" y="5" width="4" height="1" fill="#8a6633"/><rect x="15" y="4" width="2" height="1" fill="#8a6633"/><rect x="12" y="6" width="8" height="1" fill="#aa7744"/><rect x="12" y="6" width="1" height="18" fill="#aa7744"/><rect x="19" y="6" width="1" height="18" fill="#aa7744"/><rect x="12" y="23" width="8" height="1" fill="#aa7744"/><rect x="13" y="7" width="6" height="16" fill="#ffdd88"/><rect x="14" y="9" width="4" height="12" fill="#ffcc66"/><rect x="15" y="11" width="2" height="8" fill="#ffdd88" opacity="0.9"/><rect x="11" y="24" width="10" height="1" fill="#8a6633"/><rect x="12" y="25" width="8" height="1" fill="#aa7744"/><rect x="10" y="10" width="1" height="1" fill="#ffdd88" opacity="0.4"/><rect x="10" y="16" width="1" height="1" fill="#ffdd88" opacity="0.3"/><rect x="21" y="12" width="1" height="1" fill="#ffdd88" opacity="0.4"/><rect x="21" y="18" width="1" height="1" fill="#ffdd88" opacity="0.3"/><rect x="9" y="13" width="1" height="1" fill="#ffdd88" opacity="0.2"/><rect x="22" y="15" width="1" height="1" fill="#ffdd88" opacity="0.2"/></svg>
+    </div>
+    <div class="label"><span class="ko">등불</span>deungbul</div>
+  </div>
+
+  <div class="icon-card">
+    <div class="fire-yeongi" style="width:96px;height:96px;">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges"><rect x="14" y="27" width="4" height="2" fill="#553333"/><rect x="15" y="26" width="2" height="1" fill="#553333" opacity="0.7"/><rect x="13" y="23" width="1" height="1" fill="#666666"/><rect x="12" y="21" width="1" height="1" fill="#666666" opacity="0.9"/><rect x="13" y="19" width="1" height="1" fill="#888888"/><rect x="12" y="17" width="1" height="1" fill="#888888" opacity="0.8"/><rect x="13" y="15" width="1" height="1" fill="#aaaaaa" opacity="0.6"/><rect x="12" y="13" width="1" height="1" fill="#aaaaaa" opacity="0.4"/><rect x="15" y="24" width="1" height="1" fill="#666666"/><rect x="15" y="22" width="1" height="1" fill="#666666" opacity="0.9"/><rect x="14" y="20" width="1" height="1" fill="#888888"/><rect x="15" y="18" width="1" height="1" fill="#888888" opacity="0.7"/><rect x="14" y="16" width="1" height="1" fill="#aaaaaa" opacity="0.5"/><rect x="15" y="14" width="1" height="1" fill="#aaaaaa" opacity="0.3"/><rect x="17" y="24" width="1" height="1" fill="#666666"/><rect x="17" y="22" width="1" height="1" fill="#888888"/><rect x="18" y="20" width="1" height="1" fill="#888888" opacity="0.8"/><rect x="17" y="18" width="1" height="1" fill="#aaaaaa" opacity="0.6"/><rect x="18" y="16" width="1" height="1" fill="#aaaaaa" opacity="0.4"/><rect x="19" y="23" width="1" height="1" fill="#666666" opacity="0.8"/><rect x="20" y="21" width="1" height="1" fill="#888888" opacity="0.7"/><rect x="19" y="19" width="1" height="1" fill="#888888" opacity="0.5"/><rect x="20" y="17" width="1" height="1" fill="#aaaaaa" opacity="0.4"/><rect x="19" y="15" width="1" height="1" fill="#aaaaaa" opacity="0.2"/></svg>
+    </div>
+    <div class="label"><span class="ko">연기</span>yeongi</div>
+  </div>
+
+  <div class="icon-card">
+    <div class="fire-jangjak" style="width:96px;height:96px;">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges"><rect x="7" y="26" width="18" height="3" fill="#8a6633"/><rect x="9" y="22" width="16" height="3" fill="#aa7744"/><rect x="8" y="18" width="17" height="3" fill="#cc8844"/><rect x="10" y="14" width="14" height="3" fill="#aa7744"/><rect x="10" y="27" width="1" height="1" fill="#cc8844" opacity="0.5"/><rect x="18" y="26" width="1" height="1" fill="#cc8844" opacity="0.4"/><rect x="12" y="23" width="1" height="1" fill="#cc8844" opacity="0.5"/><rect x="20" y="22" width="1" height="1" fill="#8a6633" opacity="0.6"/><rect x="11" y="19" width="1" height="1" fill="#8a6633" opacity="0.4"/><rect x="19" y="18" width="1" height="1" fill="#8a6633" opacity="0.5"/><rect x="14" y="15" width="1" height="1" fill="#cc8844" opacity="0.4"/><rect x="20" y="14" width="1" height="1" fill="#8a6633" opacity="0.5"/><rect x="16" y="11" width="1" height="1" fill="#ffaa00" opacity="0.5"/></svg>
+    </div>
+    <div class="label"><span class="ko">장작</span>jangjak</div>
+  </div>
+
+</div>
+
+</body>
+</html>

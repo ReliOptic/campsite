@@ -792,6 +792,151 @@ HTMLEOF
     printf '%s' "$output_path"
 }
 
+# ---------------------------------------------------------------------------
+# camp_phaser_dist_dir — locate the Phaser build output directory.
+#
+# Search order:
+#   1. CAMPSITE_ROOT/camp-client/dist  — git-clone dev path set by bin/campsite
+#   2. $HOME/.campsite/camp-client/dist — default installed location
+#   3. CAMPSITE_HOME/camp-client/dist  — custom install path
+#
+# Prints the path and returns 0 when found; prints nothing and returns 1 if
+# no dist is available.
+# ---------------------------------------------------------------------------
+camp_phaser_dist_dir() {
+    local candidate
+    # Check CAMPSITE_ROOT (set by bin/campsite — could be ~/.campsite OR the
+    # git-clone root depending on how _resolve_root resolved it).
+    if [[ -n "${CAMPSITE_ROOT:-}" && -d "$CAMPSITE_ROOT/camp-client/dist" ]]; then
+        printf '%s' "$CAMPSITE_ROOT/camp-client/dist"
+        return 0
+    fi
+    # Default installed location
+    candidate="$HOME/.campsite/camp-client/dist"
+    if [[ -d "$candidate" ]]; then
+        printf '%s' "$candidate"
+        return 0
+    fi
+    # Custom CAMPSITE_HOME
+    if [[ -n "${CAMPSITE_HOME:-}" && -d "$CAMPSITE_HOME/camp-client/dist" ]]; then
+        printf '%s' "$CAMPSITE_HOME/camp-client/dist"
+        return 0
+    fi
+    # Last resort: check next to lib/ (the actual git-clone, even when
+    # CAMPSITE_ROOT resolved to ~/.campsite because that exists).
+    # _CAMPSITE_CAMP_LOADED is sourced from CAMPSITE_LIB which is set in the
+    # bin script; we can derive the repo root from CAMPSITE_LIB.
+    if [[ -n "${CAMPSITE_LIB:-}" ]]; then
+        candidate="$(cd "$CAMPSITE_LIB/.." 2>/dev/null && pwd)/camp-client/dist"
+        if [[ -d "$candidate" ]]; then
+            printf '%s' "$candidate"
+            return 0
+        fi
+    fi
+    return 1
+}
+
+# ---------------------------------------------------------------------------
+# camp_render_phaser — Phaser-based renderer.
+#
+# Steps:
+#   1. Generate camp.json via cmd_export (writes to .campsite/camp/camp.json).
+#   2. Copy camp-client/dist/* into .campsite/camp/phaser/.
+#   3. Patch the copied index.html to inject window.CAMP_STATE from camp.json.
+#   4. Return the path to the patched index.html.
+#
+# Returns the absolute path of the rendered index.html on stdout.
+# ---------------------------------------------------------------------------
+camp_render_phaser() {
+    local project_root="$1"
+
+    # Locate the Phaser build
+    local dist_dir
+    dist_dir="$(camp_phaser_dist_dir)" || return 1
+
+    local camp_d
+    camp_d="$(camp_dir "$project_root")"
+
+    # 1. Generate / refresh camp.json
+    local camp_json="$camp_d/camp.json"
+    # Call cmd_export which writes camp.json and also prints JSON to stdout.
+    # We suppress stdout here — we only need the side-effect of writing the file.
+    cmd_export > /dev/null 2>&1 || true
+    # If cmd_export didn't create it (e.g. project not fully init'd), write a
+    # minimal stub so the Phaser client can still load.
+    if [[ ! -f "$camp_json" ]]; then
+        printf '{"mission":{"title":"","status":"active"},"projects":[],"last_session":"","events_summary":[]}\n' > "$camp_json"
+    fi
+
+    # 2. Copy dist into .campsite/camp/phaser/
+    local phaser_dir="$camp_d/phaser"
+    mkdir -p "$phaser_dir"
+
+    # Copy index.html and assets/ subtree
+    cp "$dist_dir/index.html" "$phaser_dir/index.html"
+    if [[ -d "$dist_dir/assets" ]]; then
+        mkdir -p "$phaser_dir/assets"
+        cp "$dist_dir/assets/"* "$phaser_dir/assets/" 2>/dev/null || true
+    fi
+
+    # 3. Inject window.CAMP_STATE before the first <script> tag
+    # We read camp.json, strip newlines so it fits on one JS line, then patch
+    # the copied index.html.
+    local camp_json_inline
+    # Use awk to collapse the JSON to a single line (bash 3.2 safe — no $'...')
+    camp_json_inline="$(awk 'BEGIN{ORS=""}{print}' "$camp_json")"
+
+    # Build the injection snippet
+    local inject_script
+    inject_script="<script>window.CAMP_STATE = ${camp_json_inline};<\/script>"
+
+    # Insert the <script> tag before the first <script type="module"...> line
+    # Use a temp file for portability (BSD sed -i needs an extension).
+    local tmp_html
+    tmp_html="$(mktemp)"
+    # sed: on the line matching '<script type="module"', prepend the inject line.
+    sed "s|<script type=\"module\"|${inject_script}<script type=\"module\"|" \
+        "$phaser_dir/index.html" > "$tmp_html"
+    mv "$tmp_html" "$phaser_dir/index.html"
+
+    printf '%s/index.html' "$phaser_dir"
+}
+
+# ---------------------------------------------------------------------------
+# camp_render_phaser_serve — Phaser serve: copy + inject live-poll snippet.
+#
+# Same as camp_render_phaser but also:
+#   - Writes camp.json into the phaser dir so the Python server can expose it.
+#   - Returns the directory that should be served.
+# ---------------------------------------------------------------------------
+camp_render_phaser_serve() {
+    local project_root="$1"
+
+    # Render once (also copies dist + patches index.html)
+    local html_path
+    html_path="$(camp_render_phaser "$project_root")" || return 1
+
+    local phaser_dir
+    phaser_dir="$(dirname "$html_path")"
+    local camp_d
+    camp_d="$(camp_dir "$project_root")"
+
+    # Symlink / copy camp.json into phaser dir so the HTTP server exposes it.
+    cp "$camp_d/camp.json" "$phaser_dir/camp.json" 2>/dev/null || true
+
+    # Inject live-poll <script> if not already present.
+    if ! grep -q 'phaser-live-poll' "$html_path" 2>/dev/null; then
+        local poll_script
+        poll_script='<script id="phaser-live-poll">setInterval(async()=>{try{const r=await fetch("camp.json?t="+Date.now());if(!r.ok)return;const d=await r.json();if(window.__campGame&&window.__campGame.scene){const s=window.__campGame.scene.getScene("CampScene")||window.__campGame.scene.getScene("ReturnScene");if(s&&s.refreshState)s.refreshState(d);}window.CAMP_STATE=d;}catch(e){}},3000);<\/script>'
+        local tmp_html
+        tmp_html="$(mktemp)"
+        sed "s|</body>|${poll_script}</body>|" "$html_path" > "$tmp_html"
+        mv "$tmp_html" "$html_path"
+    fi
+
+    printf '%s' "$phaser_dir"
+}
+
 camp_open_browser() {
     local file_path="$1"
     if command -v open >/dev/null 2>&1; then
