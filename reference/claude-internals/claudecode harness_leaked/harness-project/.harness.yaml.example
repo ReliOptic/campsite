@@ -1,0 +1,20 @@
+# harness-eng configuration
+# Copy to .harness.yaml and customize
+
+preset: full-stack-web
+budget_usd: 150
+max_rounds: 3
+
+evaluation:
+  design_quality_threshold: 7
+  originality_threshold: 6
+  craft_threshold: 6
+  functionality_threshold: 8
+  plateau_threshold: 0.5
+
+# Feature flags (for ablation testing)
+features:
+  planner: true
+  design_evaluation: true
+  ai_weaving: true
+  contract_generation: true

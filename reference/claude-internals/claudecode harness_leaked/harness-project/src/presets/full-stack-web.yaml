@@ -1,0 +1,18 @@
+name: full-stack-web
+description: React + FastAPI + SQLite full-stack web application
+
+frontend:
+  framework: react
+  bundler: vite
+  styling: tailwind
+
+backend:
+  framework: fastapi
+  language: python
+
+database:
+  engine: sqlite
+  orm: sqlalchemy
+
+deployment:
+  target: docker
