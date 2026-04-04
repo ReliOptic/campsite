@@ -132,7 +132,10 @@ export function Reveal() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-8 px-6 max-w-sm mx-auto">
+    <div
+      className="flex flex-col items-center justify-center h-full gap-8 px-6 max-w-sm"
+      style={{ margin: '0 auto' }}
+    >
       <motion.p
         className="text-base font-light leading-relaxed text-center"
         style={{ color: colors.text.primary }}
