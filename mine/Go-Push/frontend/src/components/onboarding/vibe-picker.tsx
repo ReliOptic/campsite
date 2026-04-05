@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef, useEffect } from 'react';
 import { Orb } from '@/components/ui/orb';
 import { useOnboardingStore } from '@/stores/onboarding-store';
 import { colors } from '@/config/theme';
@@ -14,14 +15,18 @@ const VIBES: { id: Vibe; label: string; color: string; glow: string }[] = [
 
 export function VibePicker() {
   const { signals, setVibe, nextStep } = useOnboardingStore();
+  const selecting = useRef(false);
+  useEffect(() => { selecting.current = false; }, []);
 
   const handleSelect = (vibe: Vibe) => {
+    if (selecting.current) return;
+    selecting.current = true;
     setVibe(vibe);
-    setTimeout(() => nextStep(), 600);
+    setTimeout(() => nextStep(), 500);
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-12 px-6">
+    <div className="flex flex-col items-center justify-center h-full gap-12" style={{ paddingLeft: '1.5rem', paddingRight: '1.5rem' }}>
       <h2
         className="text-lg font-light tracking-[0.15em] text-center"
         style={{ color: colors.text.primary }}
