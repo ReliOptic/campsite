@@ -34,7 +34,7 @@ export function MicroAction() {
         ? actionStartedAt.current - promptShownAt.current
         : now - promptShownAt.current,
     });
-    setTimeout(() => nextStep(), 800);
+    setTimeout(() => nextStep(), 500);
   }, [done, setMicroAction, nextStep]);
 
   const handleCompleteRef = useRef(handleComplete);
@@ -58,7 +58,7 @@ export function MicroAction() {
   const progress = 1 - secondsLeft / config.onboarding.microActionDurationSec;
 
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-10 px-6">
+    <div className="flex flex-col items-center justify-center h-full gap-10" style={{ paddingLeft: '1.5rem', paddingRight: '1.5rem' }}>
       <h2
         className="text-lg font-light tracking-[0.15em] text-center max-w-xs"
         style={{ color: colors.text.primary }}
@@ -69,15 +69,14 @@ export function MicroAction() {
       {!started ? (
         <motion.button
           onClick={handleStart}
-          className="px-8 py-3 rounded-full cursor-pointer"
+          className="rounded-full cursor-pointer min-h-[44px] min-w-[88px]"
           style={{
+            paddingLeft: '2rem', paddingRight: '2rem', paddingTop: '0.75rem', paddingBottom: '0.75rem',
             background: colors.button.warm.bg,
             border: `1px solid ${colors.button.warm.border}`,
             color: colors.accent.warm,
           }}
           whileTap={{ scale: 0.95 }}
-          animate={{ scale: [1, 1.04, 1] }}
-          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
         >
           <span className="text-sm tracking-[0.15em] font-light">Begin</span>
         </motion.button>
@@ -94,6 +93,7 @@ export function MicroAction() {
                 fill="none" stroke={colors.accent.warm} strokeWidth="3"
                 strokeLinecap="round"
                 strokeDasharray={276.46}
+                initial={{ strokeDashoffset: 276.46 }}
                 animate={{ strokeDashoffset: 276.46 * (1 - progress) }}
                 transition={{ duration: 0.3 }}
               />
@@ -109,8 +109,9 @@ export function MicroAction() {
           {!done && (
             <motion.button
               onClick={() => handleComplete(true)}
-              className="px-8 py-3 rounded-full cursor-pointer"
+              className="rounded-full cursor-pointer min-h-[44px] min-w-[88px]"
               style={{
+                paddingLeft: '2rem', paddingRight: '2rem', paddingTop: '0.75rem', paddingBottom: '0.75rem',
                 background: colors.button.cool.bg,
                 border: `1px solid ${colors.button.cool.border}`,
                 color: colors.accent.cool,
