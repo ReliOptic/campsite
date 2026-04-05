@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useOnboardingStore } from '@/stores/onboarding-store';
 import { colors } from '@/config/theme';
@@ -15,14 +16,18 @@ const SCENES: { id: Scene; label: string; gradient: string }[] = [
 
 export function ScenePicker() {
   const { signals, setScene, nextStep } = useOnboardingStore();
+  const selecting = useRef(false);
+  useEffect(() => { selecting.current = false; }, []);
 
   const handleSelect = (scene: Scene) => {
+    if (selecting.current) return;
+    selecting.current = true;
     setScene(scene);
-    setTimeout(() => nextStep(), 600);
+    setTimeout(() => nextStep(), 500);
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-10 px-6">
+    <div className="flex flex-col items-center justify-center h-full gap-10 overflow-y-auto" style={{ paddingLeft: '1.5rem', paddingRight: '1.5rem', paddingTop: '2rem', paddingBottom: '2rem' }}>
       <h2
         className="text-lg font-light tracking-[0.15em] text-center"
         style={{ color: colors.text.primary }}
@@ -43,10 +48,11 @@ export function ScenePicker() {
             style={{
               background: s.gradient,
               height: s.id === 'space' ? 80 : 120,
-              border:
-                signals.scene === s.id
-                  ? `2px solid ${colors.card_active.border}`
-                  : `1px solid ${colors.card.border}`,
+              border: `1px solid ${colors.card.border}`,
+              outline: signals.scene === s.id
+                ? `1px solid ${colors.card_active.border}`
+                : 'none',
+              outlineOffset: '0px',
             }}
             whileTap={{ scale: 0.95 }}
           >
