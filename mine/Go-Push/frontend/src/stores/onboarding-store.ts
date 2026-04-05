@@ -10,6 +10,8 @@ import type {
 } from '@/types/onboarding.types';
 import type { IdentityRead } from '@/types/identity.types';
 
+type RevealPhase = 'loading' | 'narrative' | 'boss' | 'quest' | 'complete';
+
 interface OnboardingState {
   step: OnboardingStep;
   signals: OnboardingSignals;
@@ -18,6 +20,7 @@ interface OnboardingState {
   stepDurations: number[];
   identityRead: IdentityRead | null;
   isLoading: boolean;
+  revealPhase: RevealPhase | null;
 
   setVibe: (vibe: Vibe) => void;
   setWeight: (weight: Weight) => void;
@@ -25,6 +28,7 @@ interface OnboardingState {
   setMicroAction: (action: MicroActionSignal) => void;
   setIdentityRead: (read: IdentityRead) => void;
   setLoading: (loading: boolean) => void;
+  setRevealPhase: (phase: RevealPhase) => void;
   nextStep: () => void;
   reset: () => void;
 }
@@ -47,6 +51,7 @@ export const useOnboardingStore = create<OnboardingState>()(
       stepDurations: [],
       identityRead: null,
       isLoading: false,
+      revealPhase: null,
 
       setVibe: (vibe) =>
         set((s) => ({ signals: { ...s.signals, vibe } })),
@@ -63,6 +68,8 @@ export const useOnboardingStore = create<OnboardingState>()(
       setIdentityRead: (read) => set({ identityRead: read }),
 
       setLoading: (loading) => set({ isLoading: loading }),
+
+      setRevealPhase: (phase) => set({ revealPhase: phase }),
 
       nextStep: () => {
         const { step, stepStartedAt, stepDurations } = get();
@@ -101,8 +108,12 @@ export const useOnboardingStore = create<OnboardingState>()(
           stepDurations: [],
           identityRead: null,
           isLoading: false,
+          revealPhase: null,
         }),
     }),
-    { name: 'go-push-onboarding' },
+    {
+      name: 'go-push-onboarding',
+      skipHydration: true,
+    },
   ),
 );

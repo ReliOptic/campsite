@@ -13,10 +13,11 @@ import { BossDialogue } from '@/components/dashboard/boss-dialogue';
 import { ActionBar } from '@/components/dashboard/action-bar';
 import { RecoveryFlow } from '@/components/dashboard/recovery-flow';
 import { colors } from '@/config/theme';
+import { sendToUnity } from '@/lib/unity-bridge';
 import type { CoachId } from '@/data/coach-personas';
 
-const AmbientScene = dynamic(
-  () => import('@/components/scenes/ambient-scene').then((m) => m.AmbientScene),
+const UnityCanvas = dynamic(
+  () => import('@/components/scenes/unity-canvas').then((m) => m.UnityCanvas),
   { ssr: false },
 );
 
@@ -56,6 +57,31 @@ export default function Dashboard() {
       previousStreak.current = streak;
     }
   }, [recoveryMode, streak]);
+
+  // Track bossHp before quest completion so we can compute damage dealt
+  const prevBossHp = useRef(bossHp);
+  const prevQuestPhase = useRef(questPhase);
+  useEffect(() => {
+    const wasActive = prevQuestPhase.current === 'active';
+    const isNowComplete = questPhase === 'complete';
+    if (wasActive && isNowComplete) {
+      const damage = prevBossHp.current - bossHp;
+      if (damage > 0) {
+        sendToUnity('DEAL_DAMAGE', { amount: damage });
+      }
+    }
+    prevQuestPhase.current = questPhase;
+    if (questPhase !== 'complete') {
+      prevBossHp.current = bossHp;
+    }
+  }, [questPhase, bossHp]);
+
+  // Sync boss state to Unity on mount once bossId is available
+  useEffect(() => {
+    if (bossId !== null && bossHp > 0) {
+      sendToUnity('SET_BOSS', { id: bossId, hp: bossHp });
+    }
+  }, [bossId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     useOnboardingStore.persist.rehydrate();
@@ -98,8 +124,8 @@ export default function Dashboard() {
         <button
           onClick={() => router.push('/')}
           className="rounded-full min-h-[44px] min-w-[120px]"
-          style={{ paddingLeft: '1.5rem', paddingRight: '1.5rem', paddingTop: '0.75rem', paddingBottom: '0.75rem' }}
           style={{
+            paddingLeft: '1.5rem', paddingRight: '1.5rem', paddingTop: '0.75rem', paddingBottom: '0.75rem',
             background: colors.button.warm.bg,
             border: `1px solid ${colors.button.warm.border}`,
             color: colors.accent.warm,
@@ -136,7 +162,7 @@ export default function Dashboard() {
           onRecover={completeRecovery}
         />
       )}
-      <AmbientScene />
+      <UnityCanvas />
       <div className="relative z-10 h-full w-full flex flex-col items-center gap-8 overflow-y-auto" style={{ paddingLeft: '1.5rem', paddingRight: '1.5rem', paddingTop: '2rem', paddingBottom: '2rem' }}>
         {bossId !== null && (
           <BossDialogue bossId={bossId} category={bossDialogueCategory} />

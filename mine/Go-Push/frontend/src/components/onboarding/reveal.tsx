@@ -13,8 +13,13 @@ type RevealPhase = 'loading' | 'narrative' | 'boss' | 'quest' | 'complete';
 
 export function Reveal() {
   const router = useRouter();
-  const { signals, nextStep, setIdentityRead } = useOnboardingStore();
-  const [phase, setPhase] = useState<RevealPhase>('loading');
+  const { signals, nextStep, setIdentityRead, setRevealPhase } = useOnboardingStore();
+  const [phase, setPhaseLocal] = useState<RevealPhase>('loading');
+
+  const setPhase = useCallback((p: RevealPhase) => {
+    setPhaseLocal(p);
+    setRevealPhase(p);
+  }, [setRevealPhase]);
   const [displayedText, setDisplayedText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const narrativeRef = useRef<FallbackNarrative | null>(null);
@@ -218,8 +223,8 @@ export function Reveal() {
 
             <div
               className="rounded-2xl w-full"
-              style={{ padding: '1.5rem' }}
               style={{
+                padding: '1.5rem',
                 background: colors.card.bg,
                 border: `1px solid ${colors.card.border}`,
               }}
