@@ -23,6 +23,9 @@ interface UnityBuildConfig {
   readonly dataUrl: string;
   readonly frameworkUrl: string;
   readonly codeUrl: string;
+  readonly companyName?: string;
+  readonly productName?: string;
+  readonly productVersion?: string;
 }
 
 const BUILD_ROOT = '/unity-build/Build';
@@ -31,6 +34,9 @@ const UNITY_CONFIG: UnityBuildConfig = {
   dataUrl: `${BUILD_ROOT}/unity-build.data`,
   frameworkUrl: `${BUILD_ROOT}/unity-build.framework.js`,
   codeUrl: `${BUILD_ROOT}/unity-build.wasm`,
+  companyName: 'Go-Push',
+  productName: 'Unveil',
+  productVersion: '1.0.0',
 } as const;
 
 export function UnityCanvas() {
