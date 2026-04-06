@@ -105,7 +105,7 @@ public class SceneController : MonoBehaviour
     /// </summary>
     public void SetStep(int step)
     {
-        Debug.Log($"[SceneController] SetStep: {step}");
+        Debug.Log($"[SceneController] SetStep: {step} (state: {_stateMachine.Current})");
 
         switch (step)
         {
@@ -116,6 +116,9 @@ public class SceneController : MonoBehaviour
                 StartCurrentLevel();
                 break;
             case 2:
+                // Guard: cooldown requires Solved state. If still Playing, solve first.
+                if (_stateMachine.Current == PuzzleStateMachine.State.Playing)
+                    _stateMachine.Solve();
                 BeginCooldown();
                 break;
             case 3:
