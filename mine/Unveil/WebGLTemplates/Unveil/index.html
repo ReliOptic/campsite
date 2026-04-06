@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0f0f1a">
+  <title>{{{ PRODUCT_NAME }}}</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #0f0f1a; }
+    #unity-container {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #unity-canvas {
+      width: 100%; height: 100%;
+      background: #0f0f1a;
+    }
+    #unity-loading {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: #0f0f1a; color: #667788;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      transition: opacity 0.5s;
+    }
+    #unity-loading.hidden { opacity: 0; pointer-events: none; }
+    #unity-loading h1 { font-size: 1.5rem; font-weight: 300; letter-spacing: 0.3em; margin-bottom: 2rem; }
+    #unity-progress { width: 200px; height: 2px; background: #1a1a2e; border-radius: 1px; }
+    #unity-progress-bar { width: 0%; height: 100%; background: #44aacc; border-radius: 1px; transition: width 0.2s; }
+  </style>
+</head>
+<body>
+  <div id="unity-container">
+    <canvas id="unity-canvas" tabindex="-1"></canvas>
+    <div id="unity-loading">
+      <h1>UNVEIL</h1>
+      <div id="unity-progress">
+        <div id="unity-progress-bar"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').then(function (reg) {
+        console.log('[PWA] Service worker registered:', reg.scope);
+      }).catch(function (err) {
+        console.warn('[PWA] Service worker registration failed:', err);
+      });
+    }
+
+    // Listen for Unity messages
+    window.addEventListener('unity-message', function (e) {
+      try {
+        var msg = JSON.parse(e.detail);
+        if (msg.type === 'LOADED') {
+          document.getElementById('unity-loading').classList.add('hidden');
+        }
+        if (msg.type === 'LOADING_PROGRESS') {
+          var bar = document.getElementById('unity-progress-bar');
+          if (bar) bar.style.width = (msg.progress * 100) + '%';
+        }
+      } catch (err) {
+        // Not JSON, ignore
+      }
+    });
+
+    // Unity WebGL loader
+    var buildUrl = "Build";
+    var loaderUrl = buildUrl + "/{{{ LOADER_FILENAME }}}";
+    var config = {
+      dataUrl: buildUrl + "/{{{ DATA_FILENAME }}}",
+      frameworkUrl: buildUrl + "/{{{ FRAMEWORK_FILENAME }}}",
+      codeUrl: buildUrl + "/{{{ CODE_FILENAME }}}",
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "{{{ COMPANY_NAME }}}",
+      productName: "{{{ PRODUCT_NAME }}}",
+      productVersion: "{{{ PRODUCT_VERSION }}}"
+    };
+
+    var script = document.createElement("script");
+    script.src = loaderUrl;
+    script.onload = function () {
+      createUnityInstance(document.querySelector("#unity-canvas"), config, function (progress) {
+        var bar = document.getElementById('unity-progress-bar');
+        if (bar) bar.style.width = (progress * 100) + '%';
+      }).then(function (instance) {
+        window.unityInstance = instance;
+      }).catch(function (message) {
+        console.error('[Unity] Load error:', message);
+      });
+    };
+    document.body.appendChild(script);
+  </script>
+</body>
+</html>
