@@ -24,12 +24,15 @@ public class SceneController : MonoBehaviour
     private string _currentPhase = "";
     private Coroutine _moodTransition;
 
-    // Puzzle state
+    // Puzzle state machine
+    private readonly PuzzleStateMachine _stateMachine = new();
     private PuzzleController _activePuzzle;
     private TelemetryCollector _telemetryCollector;
     private GameObject _puzzleAnchor;
-    private int _currentPuzzleSeed;
-    private int _puzzleIndex;
+
+    // Level sequence (assign via InjectLevels or load from Resources)
+    private LevelDefinition[] _levels;
+    private int _levelIndex;
 
     // Cooldown state
     private GameObject _activeCooldown;
@@ -39,6 +42,8 @@ public class SceneController : MonoBehaviour
         CooldownSceneBuilder.BuildLightGrowth,
         CooldownSceneBuilder.BuildSandTime,
     };
+
+    public PuzzleStateMachine StateMachine => _stateMachine;
 
     private static readonly string[] VibeOrder = { "calm", "heavy", "restless", "drift", "agora" };
 
@@ -84,14 +89,19 @@ public class SceneController : MonoBehaviour
         _moodTransition = StartCoroutine(SwapMoodWorld(template));
     }
 
-    // ─── Puzzle Lifecycle ────────────────────────────────────────
+    /// <summary>
+    /// Inject level sequence for the session.
+    /// </summary>
+    public void InjectLevels(LevelDefinition[] levels)
+    {
+        _levels = levels;
+        _levelIndex = 0;
+    }
+
+    // ─── Puzzle Lifecycle (state machine driven) ─────────────────
 
     /// <summary>
-    /// Step controls the scene phase:
-    ///   0 = idle (mood world only)
-    ///   1 = start puzzle
-    ///   2 = show cooldown
-    ///   3 = next puzzle
+    /// WebBridge compat. Step: 0=idle, 1=start level, 2=cooldown, 3=next level.
     /// </summary>
     public void SetStep(int step)
     {
@@ -100,41 +110,79 @@ public class SceneController : MonoBehaviour
         switch (step)
         {
             case 0:
-                TearDownPuzzle();
-                TearDownCooldown();
+                ReturnToIdle();
                 break;
             case 1:
-                TearDownCooldown();
-                SpawnPuzzle(_currentPuzzleSeed);
+                StartCurrentLevel();
                 break;
             case 2:
-                TearDownPuzzle();
-                SpawnCooldown();
+                BeginCooldown();
                 break;
             case 3:
-                TearDownCooldown();
-                _puzzleIndex++;
-                _currentPuzzleSeed = _puzzleIndex * 7919; // deterministic seed per puzzle
-                SpawnPuzzle(_currentPuzzleSeed);
+                AdvanceToNextLevel();
                 break;
         }
     }
 
     /// <summary>
-    /// Start a puzzle with a specific seed. Called by SetStep or directly.
+    /// Start a puzzle with a specific seed (no LevelDefinition). Bridge compat.
     /// </summary>
     public void StartPuzzle(int seed)
     {
-        _currentPuzzleSeed = seed;
-        TearDownCooldown();
-        SpawnPuzzle(seed);
+        // Create an ad-hoc level definition for seed-only starts
+        var adhoc = ScriptableObject.CreateInstance<LevelDefinition>();
+        adhoc.seed = seed;
+        adhoc.levelId = $"adhoc_{seed}";
+        adhoc.gridWidth = 3;
+        adhoc.gridHeight = 3;
+        adhoc.cellSize = 2.0f;
+        adhoc.startCell = Vector2Int.zero;
+        adhoc.goalCell = new Vector2Int(2, 2);
+        adhoc.moodVibe = _currentVibe;
+
+        if (_stateMachine.Current != PuzzleStateMachine.State.Idle)
+            _stateMachine.Reset();
+
+        _stateMachine.StartLevel(adhoc, _levelIndex);
+        SpawnPuzzleFromLevel(adhoc);
     }
 
-    private void SpawnPuzzle(int seed)
+    /// <summary>
+    /// Start the current level from the injected sequence.
+    /// </summary>
+    public void StartCurrentLevel()
+    {
+        if (_levels == null || _levels.Length == 0)
+        {
+            Debug.LogWarning("[SceneController] No levels injected. Use InjectLevels() first.");
+            return;
+        }
+
+        if (_levelIndex >= _levels.Length)
+        {
+            Debug.Log("[SceneController] All levels complete.");
+            ReturnToIdle();
+            return;
+        }
+
+        TearDownCooldown();
+        var level = _levels[_levelIndex];
+
+        if (_stateMachine.Current != PuzzleStateMachine.State.Idle)
+            _stateMachine.Reset();
+
+        _stateMachine.StartLevel(level, _levelIndex);
+        SpawnPuzzleFromLevel(level);
+    }
+
+    private void SpawnPuzzleFromLevel(LevelDefinition level)
     {
         TearDownPuzzle();
 
-        // Create puzzle anchor as child of active mood world (or scene root)
+        // Set mood if level specifies one
+        if (!string.IsNullOrEmpty(level.moodVibe) && level.moodVibe != _currentVibe)
+            SetMood(level.moodVibe);
+
         Transform parent = _activeMoodWorld != null
             ? _activeMoodWorld.transform
             : transform;
@@ -143,30 +191,32 @@ public class SceneController : MonoBehaviour
         _puzzleAnchor.transform.SetParent(parent);
         _puzzleAnchor.transform.localPosition = PuzzleAnchorOffset;
 
-        // Create puzzle controller
         var puzzleGo = new GameObject("PuzzleSession");
         puzzleGo.transform.SetParent(_puzzleAnchor.transform);
         puzzleGo.transform.localPosition = Vector3.zero;
 
         _activePuzzle = puzzleGo.AddComponent<PuzzleController>();
+        _activePuzzle.Configure(level.gridWidth, level.gridHeight, level.cellSize, level.startCell, level.goalCell);
 
-        // Attach telemetry collector
         _telemetryCollector = puzzleGo.AddComponent<TelemetryCollector>();
         _telemetryCollector.Attach(_activePuzzle);
 
-        // Listen for puzzle completion
         _activePuzzle.OnPuzzleSolved += HandlePuzzleSolved;
+        _activePuzzle.StartPuzzle(level.seed);
 
-        _activePuzzle.StartPuzzle(seed);
-
-        Debug.Log($"[SceneController] Puzzle spawned at anchor. Seed: {seed}");
+        _stateMachine.BeginPlaying();
+        Debug.Log($"[SceneController] Level '{level.levelId}' spawned. Seed: {level.seed}");
     }
 
     private void HandlePuzzleSolved(float solveTime)
     {
-        Debug.Log($"[SceneController] Puzzle solved in {solveTime:F1}s. Transitioning to cooldown.");
+        _stateMachine.Solve();
 
-        // Brief delay, then show cooldown
+        int stars = _stateMachine.CurrentLevel != null
+            ? _stateMachine.CurrentLevel.GetStarRating(_activePuzzle.RotationCount)
+            : 0;
+
+        Debug.Log($"[SceneController] Puzzle solved in {solveTime:F1}s. Stars: {stars}. Transitioning to cooldown.");
         StartCoroutine(TransitionToCooldown(1.5f));
     }
 
@@ -174,6 +224,12 @@ public class SceneController : MonoBehaviour
     {
         yield return new WaitForSeconds(delay);
         TearDownPuzzle();
+        BeginCooldown();
+    }
+
+    private void BeginCooldown()
+    {
+        _stateMachine.BeginCooldown();
         SpawnCooldown();
 
         if (WebBridge.Instance != null)
@@ -184,8 +240,10 @@ public class SceneController : MonoBehaviour
     {
         TearDownCooldown();
 
-        // Cycle through cooldown scenes
-        int cooldownIndex = _puzzleIndex % CooldownBuilders.Length;
+        int cooldownIndex = _stateMachine.CurrentLevel != null
+            ? _stateMachine.CurrentLevel.cooldownIndex
+            : _levelIndex % CooldownBuilders.Length;
+
         _activeCooldown = CooldownBuilders[cooldownIndex]();
 
         Transform parent = _activeMoodWorld != null
@@ -196,6 +254,32 @@ public class SceneController : MonoBehaviour
         _activeCooldown.transform.localPosition = PuzzleAnchorOffset;
 
         Debug.Log($"[SceneController] Cooldown scene {cooldownIndex} spawned.");
+    }
+
+    private void AdvanceToNextLevel()
+    {
+        TearDownCooldown();
+        _levelIndex++;
+
+        if (_levels != null && _levelIndex < _levels.Length)
+        {
+            var next = _levels[_levelIndex];
+            _stateMachine.NextLevel(next);
+            SpawnPuzzleFromLevel(next);
+        }
+        else
+        {
+            Debug.Log("[SceneController] Session complete. Returning to idle.");
+            ReturnToIdle();
+        }
+    }
+
+    private void ReturnToIdle()
+    {
+        TearDownPuzzle();
+        TearDownCooldown();
+        if (_stateMachine.Current != PuzzleStateMachine.State.Idle)
+            _stateMachine.Reset();
     }
 
     private void TearDownPuzzle()
