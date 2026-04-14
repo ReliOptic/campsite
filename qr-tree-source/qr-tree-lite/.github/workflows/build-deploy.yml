@@ -1,0 +1,59 @@
+name: Build and Deploy QR Tree
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'qr-tree-lite/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'qr-tree-lite/**'
+  workflow_dispatch: # Allow manual trigger
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: qr-tree-lite/package-lock.json
+
+      - name: Install dependencies
+        working-directory: qr-tree-lite
+        run: npm ci
+
+      - name: Build
+        working-directory: qr-tree-lite
+        run: npm run build
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: qr-tree-lite/dist
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: macos-latest
+    
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
