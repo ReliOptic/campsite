@@ -17,8 +17,9 @@ teardown() {
 _run_camp() {
     run bash -c "
         export CAMPSITE_HOME='$CAMPSITE_HOME'
+        export CAMPSITE_DISABLE_PHASER=1
         cd '$TEST_PROJECT'
-        '$PROJECT_ROOT/bin/campsite' camp \$*
+        '$PROJECT_ROOT/bin/campsite' camp \"\$@\"
     " -- "$@"
 }
 
@@ -56,9 +57,8 @@ _run_camp() {
     _run_camp --print-path --no-open
 
     [[ "$status" -eq 0 ]]
-    grep -q "Quiet camp" "$TEST_PROJECT/.campsite/camp/index.html"
-    grep -q "Awaiting entry" "$TEST_PROJECT/.campsite/camp/index.html"
-    grep -q "0 participants" "$TEST_PROJECT/.campsite/camp/index.html"
+    grep -q "participantCount: 0" "$TEST_PROJECT/.campsite/camp/index.html"
+    grep -q "조용한" "$TEST_PROJECT/.campsite/camp/index.html"
 }
 
 @test "camp participant enter and update persist local state files" {
@@ -127,7 +127,7 @@ _run_camp() {
         cd '$TEST_PROJECT'
         hash_store '$TEST_PROJECT'
         lock_acquire '$TEST_PROJECT' tester claude
-        camp_session_start '$TEST_PROJECT' claude \"$$\" 'test-tty' >/dev/null
+        camp_session_start '$TEST_PROJECT' claude \$\$ 'test-tty' >/dev/null
         printf '\n- notes: updated\n' >> '$TEST_PROJECT/handoff.md'
         cmd_save
     "
@@ -156,7 +156,7 @@ _run_camp() {
         source '$PROJECT_ROOT/bin/campsite'
         cd '$TEST_PROJECT'
         lock_acquire '$TEST_PROJECT' tester claude
-        camp_session_start '$TEST_PROJECT' claude \"$$\" 'test-tty' >/dev/null
+        camp_session_start '$TEST_PROJECT' claude \$\$ 'test-tty' >/dev/null
         cmd_peek
     "
 

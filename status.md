@@ -4,8 +4,8 @@
 
 - phase: building
 - confidence: medium
-- last-updated: 2026-04-04
-- last-agent: claude-opus
+- last-updated: 2026-04-27
+- last-agent: claude-sonnet
 - last-device: Kiwonui-MacBookAir
 
 ## Active Branch
@@ -46,12 +46,14 @@
 - Camp render HTML includes Google Fonts CDN for Inter and Space Grotesk.
 - `install.sh` no longer falsely requires bash 4+ (actual minimum: bash 3.2).
 - CI now runs `make test-hybrid`.
+- Freshness now drives launcher confidence and blocking semantics (`bin/campsite:107-118`, `1649-1663`).
+- Serve-mode environmental scene (forest edges, ground tiles, props) is implemented (`lib/camp.sh:590-666`).
 
 ## What Does Not Work Yet
 
-- Freshness is still advisory and not yet driving launcher confidence or blocking semantics.
-- No generated pixel art assets yet — CSS/SVG fallback layer is complete but `design/export/` is empty.
-- Serve-mode environmental scene (forest edges, ground tiles, props) not yet implemented.
+- No generated pixel art assets — `design/export/` is empty, Phaser storyworld is inactive.
+- Participant `last_seen` displays raw ISO 8601 timestamps (relative time conversion not implemented).
+- "1 participants in camp" — singular/plural grammar bug.
 
 ## Blockers
 

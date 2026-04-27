@@ -15,24 +15,25 @@ teardown() {
 @test "recover clears orphaned lock with dead PID" {
     # Acquire a real lock (sets host via detect_device), then replace PID with dead one
     lock_acquire "$TEST_PROJECT" "olduser" "claude"
-    local lock_file
-    lock_file="$(lock_path "$TEST_PROJECT")"
+    local lock_dir lock_pid_file
+    lock_dir="$(lock_path "$TEST_PROJECT")"
+    lock_pid_file="$lock_dir/pid"
 
-    local tmp="$lock_file.new"
-    grep -v "^pid:" "$lock_file" > "$tmp"
+    local tmp="$lock_pid_file.new"
+    grep -v "^pid:" "$lock_pid_file" > "$tmp"
     printf 'pid: 99999999\n' >> "$tmp"
-    mv "$tmp" "$lock_file"
+    mv "$tmp" "$lock_pid_file"
 
-    [[ -f "$lock_file" ]]
+    [[ -d "$lock_dir" ]]
 
     # Check if orphan
     run lock_check_orphan "$TEST_PROJECT"
     [[ "$status" -eq 0 ]]
 
     # Clear orphan
-    rm -f "$lock_file"
+    rm -rf "$lock_dir"
 
-    [[ ! -f "$lock_file" ]]
+    [[ ! -d "$lock_dir" ]]
 }
 
 @test "recover preserves active lock with live PID" {
@@ -41,7 +42,7 @@ teardown() {
     run lock_check_orphan "$TEST_PROJECT"
     [[ "$status" -eq 1 ]]
     
-    [[ -f "$TEST_PROJECT/.campsite/lock" ]]
+    [[ -d "$TEST_PROJECT/.campsite/lock" ]]
 }
 
 @test "recover cleans stale compiled files without lock" {

@@ -966,7 +966,8 @@ cmd_camp() {
                     existing="$(camp_participant_get "$project" "$participant_id")"
                     [[ -n "$existing" ]] || fail "unknown participant: $participant_id" "Run 'campsite camp participant enter $participant_id ...' first."
 
-                    IFS=$'\t' read -r _id name ptype tool terminal fire_state summary blocker next_action _last_updated priority <<< "$existing"
+                    local _ep; _ep="$(printf '%s' "$existing" | tr '\t' '\037')"
+                    IFS=$'\037' read -r _id name ptype tool terminal fire_state summary blocker next_action _last_updated priority <<< "$_ep"
                     local old_state="$fire_state"
 
                     for arg in "$@"; do

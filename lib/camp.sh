@@ -254,7 +254,8 @@ camp_session_finish() {
     existing="$(camp_participant_get "$project_root" "$participant_id")"
     [[ -n "$existing" ]] || return 0
 
-    IFS=$'\t' read -r _id name ptype stored_tool terminal old_state summary blocker next_action _last_updated priority <<< "$existing"
+    local _ep; _ep="$(printf '%s' "$existing" | tr '\t' '\037')"
+    IFS=$'\037' read -r _id name ptype stored_tool terminal old_state summary blocker next_action _last_updated priority <<< "$_ep"
 
     local new_state new_summary
     next_action="$(field_value "$project_root/handoff.md" "task" 2>/dev/null || echo "$next_action")"
@@ -883,6 +884,7 @@ HTMLEOF
 # no dist is available.
 # ---------------------------------------------------------------------------
 camp_phaser_dist_dir() {
+    [[ -n "${CAMPSITE_DISABLE_PHASER:-}" ]] && return 1
     local candidate
     # Check CAMPSITE_ROOT (set by bin/campsite — could be ~/.campsite OR the
     # git-clone root depending on how _resolve_root resolved it).
