@@ -146,3 +146,69 @@ EOF
     result="$(freshness_label_for_file "$TEST_TEMP_DIR/fresh.txt")"
     [[ "$result" == *"old" ]]
 }
+
+# --- project_freshness_level tests ---
+
+@test "project_freshness_level returns fresh for new files" {
+    touch "$TEST_TEMP_DIR/status.md" "$TEST_TEMP_DIR/handoff.md"
+    result="$(project_freshness_level "$TEST_TEMP_DIR")"
+    [[ "$result" == "fresh" ]]
+}
+
+@test "project_freshness_level returns worst level across files" {
+    # status.md fresh, handoff.md ancient → worst is stale
+    touch "$TEST_TEMP_DIR/status.md"
+    touch -t "$(date -u -v-30d +%Y%m%d%H%M 2>/dev/null || date -u -d '30 days ago' +%Y%m%d%H%M)" "$TEST_TEMP_DIR/handoff.md"
+    result="$(project_freshness_level "$TEST_TEMP_DIR")"
+    [[ "$result" == "stale" ]]
+}
+
+# --- effective_confidence tests ---
+
+@test "effective_confidence: fresh state preserves stated confidence" {
+    [[ "$(effective_confidence high fresh)"   == "high"   ]]
+    [[ "$(effective_confidence medium fresh)" == "medium" ]]
+    [[ "$(effective_confidence low fresh)"    == "low"    ]]
+}
+
+@test "effective_confidence: aging state degrades one rank" {
+    [[ "$(effective_confidence high aging)"   == "medium" ]]
+    [[ "$(effective_confidence medium aging)" == "low"    ]]
+    [[ "$(effective_confidence low aging)"    == "low"    ]]
+}
+
+@test "effective_confidence: stale state floors at low" {
+    [[ "$(effective_confidence high stale)"   == "low" ]]
+    [[ "$(effective_confidence medium stale)" == "low" ]]
+    [[ "$(effective_confidence low stale)"    == "low" ]]
+}
+
+@test "effective_confidence: unknown stays unknown" {
+    [[ "$(effective_confidence unknown stale)" == "unknown" ]]
+    [[ "$(effective_confidence "" aging)"      == "unknown" ]]
+}
+
+# --- freshness_gate_action tests ---
+
+@test "freshness_gate_action: fresh always proceeds" {
+    [[ "$(freshness_gate_action fresh)" == "proceed" ]]
+    CAMPSITE_FRESHNESS_POLICY=off  result="$(freshness_gate_action fresh)"
+    [[ "$result" == "proceed" ]]
+}
+
+@test "freshness_gate_action: strict policy blocks stale, warns aging" {
+    [[ "$(freshness_gate_action stale)" == "block" ]]
+    [[ "$(freshness_gate_action aging)" == "warn"  ]]
+}
+
+@test "freshness_gate_action: warn policy never blocks" {
+    CAMPSITE_FRESHNESS_POLICY=warn
+    [[ "$(freshness_gate_action stale)" == "warn" ]]
+    [[ "$(freshness_gate_action aging)" == "warn" ]]
+}
+
+@test "freshness_gate_action: off policy proceeds on everything" {
+    CAMPSITE_FRESHNESS_POLICY=off
+    [[ "$(freshness_gate_action stale)" == "proceed" ]]
+    [[ "$(freshness_gate_action aging)" == "proceed" ]]
+}

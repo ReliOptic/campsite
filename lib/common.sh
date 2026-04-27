@@ -149,3 +149,84 @@ freshness_label_for_file() {
         printf '%dd old' $(( age / 86400 ))
     fi
 }
+
+# Worst freshness across the source-of-truth files (status.md + handoff.md).
+# Result: fresh < aging < stale (returns the most degraded level seen).
+project_freshness_level() {
+    local project="$1"
+    local files="${CAMPSITE_SOURCE_FILES:-status.md handoff.md}"
+    local worst="fresh"
+    local f level
+    for f in $files; do
+        [[ -f "$project/$f" ]] || continue
+        level="$(freshness_level_for_file "$project/$f")"
+        case "$level" in
+            stale) worst="stale" ;;
+            aging) [[ "$worst" != "stale" ]] && worst="aging" ;;
+        esac
+    done
+    printf '%s' "$worst"
+}
+
+# Confidence rank: low=1, medium=2, high=3 (everything else => 0 unknown).
+_confidence_rank() {
+    case "$1" in
+        high)   printf '3' ;;
+        medium) printf '2' ;;
+        low)    printf '1' ;;
+        *)      printf '0' ;;
+    esac
+}
+
+_rank_confidence() {
+    case "$1" in
+        3) printf 'high' ;;
+        2) printf 'medium' ;;
+        1) printf 'low' ;;
+        *) printf 'unknown' ;;
+    esac
+}
+
+# Effective confidence = stated confidence degraded by freshness.
+# - aging: drop one rank (high→medium, medium→low)
+# - stale: floor at low
+# Unknown stated confidence stays unknown.
+effective_confidence() {
+    local stated="$1" freshness="$2"
+    local rank
+    rank="$(_confidence_rank "$stated")"
+    if [[ "$rank" -eq 0 ]]; then
+        printf 'unknown'
+        return 0
+    fi
+    case "$freshness" in
+        stale) rank=1 ;;
+        aging) (( rank > 1 )) && rank=$(( rank - 1 )) ;;
+    esac
+    _rank_confidence "$rank"
+}
+
+# Decide what the launcher should do given a freshness level.
+# Returns (stdout): proceed | warn | block
+# Driven by CAMPSITE_FRESHNESS_POLICY (default: strict)
+#   strict: aging→warn, stale→block
+#   warn:   aging→warn, stale→warn
+#   off:    everything proceeds
+freshness_gate_action() {
+    local freshness="$1"
+    local policy="${CAMPSITE_FRESHNESS_POLICY:-strict}"
+
+    [[ "$freshness" == "fresh" ]] && { printf 'proceed'; return 0; }
+
+    case "$policy" in
+        off)    printf 'proceed' ;;
+        warn)   printf 'warn' ;;
+        strict|*)
+            case "$freshness" in
+                stale) printf 'block' ;;
+                aging) printf 'warn' ;;
+                *)     printf 'proceed' ;;
+            esac
+            ;;
+    esac
+}

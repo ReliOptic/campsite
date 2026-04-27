@@ -4,14 +4,14 @@
 
 - phase: building
 - confidence: medium
-- last-updated: 2026-04-04
+- last-updated: 2026-04-27
 - last-agent: claude-opus
 - last-device: Kiwonui-MacBookAir
 
 ## Active Branch
 
-- branch: main
-- base: none
+- branch: claude/improve-north-star-1klPC
+- base: main
 
 ## What Works
 
@@ -46,10 +46,10 @@
 - Camp render HTML includes Google Fonts CDN for Inter and Space Grotesk.
 - `install.sh` no longer falsely requires bash 4+ (actual minimum: bash 3.2).
 - CI now runs `make test-hybrid`.
+- Freshness now drives the launcher: stale state blocks (with `--force` / `CAMPSITE_FRESHNESS_POLICY=warn|off` overrides), aging warns, and stated confidence is degraded by freshness in the launcher list, status output, and session banner.
 
 ## What Does Not Work Yet
 
-- Freshness is still advisory and not yet driving launcher confidence or blocking semantics.
 - No generated pixel art assets yet — CSS/SVG fallback layer is complete but `design/export/` is empty.
 - Serve-mode environmental scene (forest edges, ground tiles, props) not yet implemented.
 

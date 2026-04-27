@@ -63,16 +63,24 @@ ui_project_list() {
             status_indicator="${_C_GREEN}available${_C_RESET}"
         fi
 
-        # Staleness check
-        local mtime now_epoch age
-        mtime="$(portable_stat_mtime "$dir/status.md" 2>/dev/null || echo 0)"
-        now_epoch="$(date +%s)"
-        age=$(( now_epoch - mtime ))
-        local stale_seconds=$(( CAMPSITE_STALE_DAYS * 86400 ))
-        local stale_warn=""
-        if [[ $age -gt $stale_seconds ]]; then
-            local days=$(( age / 86400 ))
-            stale_warn=" ${_C_YELLOW}${days}d stale${_C_RESET}"
+        # Freshness check (advisory in list; gate runs on selection)
+        local fresh_level fresh_warn=""
+        fresh_level="$(project_freshness_level "$dir")"
+        case "$fresh_level" in
+            stale)
+                fresh_warn=" ${_C_RED}$(freshness_label_for_file "$dir/status.md")${_C_RESET}"
+                ;;
+            aging)
+                fresh_warn=" ${_C_YELLOW}$(freshness_label_for_file "$dir/status.md")${_C_RESET}"
+                ;;
+        esac
+
+        # Effective confidence (stated × freshness)
+        local stated_conf eff_conf conf_hint=""
+        stated_conf="$(field_value "$dir/status.md" "confidence" 2>/dev/null || echo "unknown")"
+        eff_conf="$(effective_confidence "$stated_conf" "$fresh_level")"
+        if [[ "$eff_conf" != "$stated_conf" && "$eff_conf" != "unknown" ]]; then
+            conf_hint=" ${_C_DIM}(conf:${eff_conf})${_C_RESET}"
         fi
 
         # Ghost hint
@@ -81,8 +89,8 @@ ui_project_list() {
             ghost=" ${_C_DIM}← default${_C_RESET}"
         fi
 
-        printf "  ${_C_DIM}%2d${_C_RESET}  %-20s │ %-10s │ %b%b%b\n" \
-            "$i" "$name" "$phase" "$status_indicator" "$stale_warn" "$ghost"
+        printf "  ${_C_DIM}%2d${_C_RESET}  %-20s │ %-10s │ %b%b%b%b\n" \
+            "$i" "$name" "$phase" "$status_indicator" "$fresh_warn" "$conf_hint" "$ghost"
 
         i=$((i + 1))
     done
@@ -192,12 +200,21 @@ ui_banner() {
     printf '\n'
     printf "  ${_C_BOLD}%s${_C_RESET} │ %s │ %s\n" "$(basename "$project")" "$agent" "$device"
 
-    local phase
+    local phase task stated_conf level eff_conf conf_line
     phase="$(field_value "$project/status.md" "phase" 2>/dev/null || echo "?")"
-    local task
     task="$(field_value "$project/handoff.md" "task" 2>/dev/null || echo "?")"
+    stated_conf="$(field_value "$project/status.md" "confidence" 2>/dev/null || echo "unknown")"
+    level="$(project_freshness_level "$project" 2>/dev/null || echo "fresh")"
+    eff_conf="$(effective_confidence "$stated_conf" "$level")"
+
+    if [[ "$eff_conf" != "$stated_conf" && "$eff_conf" != "unknown" ]]; then
+        conf_line="${stated_conf} → ${eff_conf} (${level})"
+    else
+        conf_line="$stated_conf"
+    fi
 
     printf "  phase: %s\n" "$phase"
+    printf "  confidence: %s\n" "$conf_line"
     printf "  next: %s\n" "$task"
     printf '\n'
 }

@@ -56,7 +56,8 @@ usage() {
 campsite $version — project state compiler for AI coding agents
 
 usage:
-  campsite                Interactive launcher
+  campsite                Interactive launcher (refuses to run on stale state)
+  campsite --force        Launcher, but skip the freshness gate
   campsite setup          First-run guided setup
   campsite init [path]    Bootstrap a new campsite project
   campsite sync           Compile source of truth → agent context files
@@ -80,11 +81,73 @@ usage:
 
   campsite --version      Print version
   campsite help           Show this message
+
+env:
+  CAMPSITE_FRESHNESS_POLICY={strict|warn|off}   default: strict
+    strict: aging→warn, stale→block on launch
+    warn:   surface warnings but never block
+    off:    disable freshness gate entirely
+  CAMPSITE_STALE_DAYS=N    default: 2 — days before status/handoff become stale
 EOF
+}
+
+# Freshness gate — fail closed on stale source-of-truth files.
+# A returning agent must not run on rotten context. The gate consults
+# `freshness_gate_action` (driven by CAMPSITE_FRESHNESS_POLICY) and decides:
+#   proceed: silent, fresh state.
+#   warn:    print elapsed-time warning, continue (aging or warn-policy).
+#   block:   refuse to launch unless the user resyncs or explicitly --force's.
+# CAMPSITE_FORCE=1 (env) is honored as an alternative to --force.
+_launcher_freshness_gate() {
+    local project="$1" force="${2:-0}"
+    [[ "${CAMPSITE_FORCE:-0}" == "1" ]] && force=1
+
+    local level action
+    level="$(project_freshness_level "$project")"
+    action="$(freshness_gate_action "$level")"
+
+    case "$action" in
+        proceed)
+            return 0
+            ;;
+        warn)
+            local age_status age_handoff
+            age_status="$(freshness_label_for_file "$project/status.md" 2>/dev/null || echo "?")"
+            age_handoff="$(freshness_label_for_file "$project/handoff.md" 2>/dev/null || echo "?")"
+            warn "camp state is ${level} (status:${age_status}, handoff:${age_handoff})"
+            printf '  \033[2mhint:\033[0m run \033[1mcampsite sync\033[0m to refresh, or continue at lower confidence.\n' >&2
+            ;;
+        block)
+            if [[ "$force" == "1" ]]; then
+                warn "camp state is stale — proceeding due to --force"
+                return 0
+            fi
+            local age_status age_handoff
+            age_status="$(freshness_label_for_file "$project/status.md" 2>/dev/null || echo "?")"
+            age_handoff="$(freshness_label_for_file "$project/handoff.md" 2>/dev/null || echo "?")"
+            printf '\n' >&2
+            printf '  \033[31m◎\033[0m  camp state is stale — refusing to launch on rotten context.\n' >&2
+            printf '     status.md: %s   handoff.md: %s\n' "$age_status" "$age_handoff" >&2
+            printf '\n' >&2
+            printf '  recovery options:\n' >&2
+            printf '    - update status.md / handoff.md, then \033[1mcampsite sync\033[0m\n' >&2
+            printf '    - skip the gate this once: \033[1mcampsite --force\033[0m\n' >&2
+            printf '    - relax the policy: \033[1mCAMPSITE_FRESHNESS_POLICY=warn\033[0m (or \033[1moff\033[0m)\n' >&2
+            printf '\n' >&2
+            exit 2
+            ;;
+    esac
 }
 
 # --- campsite (no args) — interactive launcher ---
 cmd_launcher() {
+    local force=0
+    for arg in "$@"; do
+        case "$arg" in
+            --force|-f) force=1 ;;
+        esac
+    done
+
     launcher  # from ui.sh — sets SELECTED_PROJECT, SELECTED_AGENT
 
     local project="$SELECTED_PROJECT"
@@ -96,6 +159,9 @@ cmd_launcher() {
 
     # Validate
     _validate_project "$project" quiet
+
+    # Freshness gate — recovery-first: stale state must not silently launch.
+    _launcher_freshness_gate "$project" "$force"
 
     # Hash integrity check
     if ! hash_compare "$project" 2>/dev/null; then
@@ -420,9 +486,11 @@ cmd_status() {
     local last_device
     last_device="$(field_value "$project/status.md" "last-device" 2>/dev/null || echo "?")"
     local freshness_level
-    freshness_level="$(freshness_level_for_file "$project/status.md")"
+    freshness_level="$(project_freshness_level "$project")"
     local freshness_label
     freshness_label="$(freshness_label_for_file "$project/status.md")"
+    local effective_conf
+    effective_conf="$(effective_confidence "$confidence" "$freshness_level")"
 
     local task
     task="$(field_value "$project/handoff.md" "task" 2>/dev/null || echo "?")"
@@ -450,7 +518,11 @@ cmd_status() {
 
     # Operational metadata
     printf "  phase:            %s\n" "$phase"
-    printf "  confidence:       %s\n" "$confidence"
+    if [[ "$effective_conf" != "$confidence" && "$effective_conf" != "unknown" ]]; then
+        printf "  confidence:       %s → %s (degraded by %s state)\n" "$confidence" "$effective_conf" "$freshness_level"
+    else
+        printf "  confidence:       %s\n" "$confidence"
+    fi
     printf "  freshness:        %s (%s)\n" "$freshness_level" "$freshness_label"
     printf "  last-updated:     %s\n" "$last_updated"
     printf "  last-agent:       %s\n" "$last_agent"
@@ -1726,14 +1798,14 @@ EOF
 
 main() {
     case "${1:-}" in
-        "")
+        ""|--force|-f)
             # First-run detection — friendly welcome
             if [[ ! -f "$(campsite_global_dir)/setup-complete" ]]; then
                 printf '\n'
                 printf '  \033[33m◎\033[0m  처음이시네요! 캠프를 만들어볼까요?\n'
                 printf '     \033[2m어렵지 않아요. 1분이면 됩니다.\033[0m\n'
                 printf '\n'
-                cmd_setup "$@"
+                cmd_setup
                 return $?
             fi
             # Project-level first-run: auto-init if in a git repo without .campsite/
@@ -1741,7 +1813,7 @@ main() {
                 first_run_flow
                 return $?
             fi
-            cmd_launcher
+            cmd_launcher "$@"
             ;;
         setup)
             shift; cmd_setup "$@"
