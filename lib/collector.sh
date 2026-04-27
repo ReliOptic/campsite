@@ -104,9 +104,12 @@ collector_git_snapshot() {
     [[ -n "$insertions" ]] || insertions=0
     [[ -n "$deletions" ]] || deletions=0
 
+    local git_snap_f
+    git_snap_f="$(_collector_git_snapshot_path "$project_root")"
     printf '%s\t%s\t%s\t%s\t%s\n' \
         "$ts" "$commit_hash" "$files_changed" "$insertions" "$deletions" \
-        >> "$(_collector_git_snapshot_path "$project_root")"
+        >> "$git_snap_f"
+    collector_rotate_tsv "$git_snap_f" 500 250
 
     # Touch sentinel
     touch "$(_collector_last_activity_path "$project_root")"
@@ -127,9 +130,12 @@ collector_record_commit() {
     subject="$(printf '%s' "$subject" | tr '\t\r\n' '   ')"
     author="$(printf '%s' "$author" | tr '\t\r\n' '   ')"
 
+    local commits_f
+    commits_f="$(_collector_commits_path "$project_root")"
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
         "$ts" "$commit_hash" "$author" "$subject" "$files_changed" "$insertions" "$deletions" \
-        >> "$(_collector_commits_path "$project_root")"
+        >> "$commits_f"
+    collector_rotate_tsv "$commits_f" 1000 500
 
     # Also record as event
     collector_record_event "$project_root" "commit" "${author}: ${subject} (${files_changed} files)" "git"
@@ -165,6 +171,7 @@ collector_file_activity() {
             local fname
             fname="$(basename "$check_file")"
             printf '%s\t%s\tmodified\n' "$ts" "$fname" >> "$file_act_f"
+            collector_rotate_tsv "$file_act_f" 2000 1000
             collector_record_event "$project_root" "file_change" "$fname modified" "filesystem"
         fi
     done
@@ -189,11 +196,41 @@ collector_record_event() {
     description="$(printf '%s' "$description" | tr '\t\r\n' '   ')"
     source="$(printf '%s' "$source" | tr '\t\r\n' '   ')"
 
+    local events_f
+    events_f="$(_collector_events_path "$project_root")"
     printf '%s\t%s\t%s\t%s\n' \
         "$ts" "$event_type" "$description" "$source" \
-        >> "$(_collector_events_path "$project_root")"
+        >> "$events_f"
+    collector_rotate_tsv "$events_f" 2000 1000
 
     touch "$(_collector_last_activity_path "$project_root")"
+}
+
+# ---------------------------------------------------------------------------
+# collector_rotate_tsv — trim TSV file to keep_lines when max_lines exceeded
+# Preserves header row (line 1). bash 3.2 compatible.
+# Usage: collector_rotate_tsv <file> [max_lines=1000] [keep_lines=500]
+# ---------------------------------------------------------------------------
+
+collector_rotate_tsv() {
+    local file="$1"
+    local max_lines="${2:-1000}"
+    local keep_lines="${3:-500}"
+
+    [[ -f "$file" ]] || return 0
+
+    local total
+    total="$(wc -l < "$file" | tr -d ' ')"
+
+    [[ "$total" -le "$max_lines" ]] && return 0
+
+    # Keep header + last keep_lines data rows
+    local header
+    header="$(head -1 "$file")"
+    local tmp="${file}.rot$$"
+    printf '%s\n' "$header" > "$tmp"
+    tail -"$keep_lines" "$file" >> "$tmp"
+    mv "$tmp" "$file"
 }
 
 # ---------------------------------------------------------------------------
@@ -318,9 +355,29 @@ collector_recent_commits_count() {
 
     [[ -f "$commits_f" ]] || { printf '0'; return; }
 
-    # Count non-header lines (simple count, all recent)
+    # Filter rows whose ISO timestamp (col 1) falls within the last window_sec seconds.
+    # Timestamps are stored as %Y-%m-%dT%H:%M:%SZ (UTC).
+    # macOS date -j and GNU date are both handled via a portable awk approach:
+    # compare string-sortable ISO timestamps (UTC, fixed format) directly.
+    local now cutoff_ts
+    now="$(date -u +%s)"
+    local cutoff=$(( now - window_sec ))
+    # Build cutoff as ISO string for awk string comparison (YYYY-MM-DDTHH:MM:SSZ)
+    # macOS: date -u -r <epoch>; GNU: date -u -d @<epoch>
+    if date -u -r "$cutoff" '+%Y-%m-%dT%H:%M:%SZ' >/dev/null 2>&1; then
+        cutoff_ts="$(date -u -r "$cutoff" '+%Y-%m-%dT%H:%M:%SZ')"
+    else
+        cutoff_ts="$(date -u -d "@$cutoff" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || printf '')"
+    fi
+
+    if [[ -z "$cutoff_ts" ]]; then
+        # Fallback: count all non-header rows
+        awk 'NR > 1' "$commits_f" 2>/dev/null | wc -l | tr -d ' '
+        return
+    fi
+
     local total
-    total="$(awk 'NR > 1' "$commits_f" 2>/dev/null | wc -l | tr -d ' ')"
+    total="$(awk -F'\t' -v cutoff="$cutoff_ts" 'NR > 1 && $1 >= cutoff' "$commits_f" 2>/dev/null | wc -l | tr -d ' ')"
     printf '%s' "${total:-0}"
 }
 

@@ -14,9 +14,17 @@ teardown() {
 
 # --- hash_compute tests ---
 
-@test "hash_compute creates known-hash file" {
+@test "hash_compute does not write known-hash file" {
+    rm -f "$TEST_PROJECT/.campsite/known-hash"
     hash_compute "$TEST_PROJECT"
-    
+
+    [[ ! -f "$TEST_PROJECT/.campsite/known-hash" ]]
+}
+
+@test "hash_store creates known-hash file" {
+    rm -f "$TEST_PROJECT/.campsite/known-hash"
+    hash_store "$TEST_PROJECT"
+
     [[ -f "$TEST_PROJECT/.campsite/known-hash" ]]
 }
 

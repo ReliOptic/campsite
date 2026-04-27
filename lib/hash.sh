@@ -3,12 +3,10 @@
 [[ -n "${_CAMPSITE_HASH_LOADED:-}" ]] && return 0
 _CAMPSITE_HASH_LOADED=1
 
-# Compute combined hash of source-of-truth files
-# Stores result in .campsite/known-hash
+# Compute and return the combined hash of source-of-truth files.
+# Pure function — does NOT write to disk.
 hash_compute() {
     local project_root="$1"
-    local campsite_dir
-    campsite_dir="$(project_campsite_dir "$project_root")"
 
     local source_files="${CAMPSITE_SOURCE_FILES:-status.md handoff.md}"
     local combined=""
@@ -27,11 +25,23 @@ hash_compute() {
         || printf '%s' "$combined" | shasum -a 256 2>/dev/null | cut -d' ' -f1 \
         || printf '%s' "$combined")"
 
-    printf '%s' "$final" > "$campsite_dir/known-hash"
     printf '%s' "$final"
 }
 
-# Compare current hash with stored hash
+# Persist the current hash to .campsite/known-hash.
+# Must be called explicitly after intentional state changes.
+hash_store() {
+    local project_root="$1"
+    local campsite_dir
+    campsite_dir="$(project_campsite_dir "$project_root")"
+
+    local hash
+    hash="$(hash_compute "$project_root")"
+    printf '%s' "$hash" > "$campsite_dir/known-hash"
+}
+
+# Compare current hash with stored hash.
+# Pure — does NOT write to disk.
 # Returns: 0 = match, 1 = mismatch, 2 = no stored hash
 hash_compare() {
     local project_root="$1"
@@ -50,12 +60,6 @@ hash_compare() {
     else
         return 1
     fi
-}
-
-# Store current hash without returning it
-hash_store() {
-    local project_root="$1"
-    hash_compute "$project_root" > /dev/null
 }
 
 # -------------------------------------------------------

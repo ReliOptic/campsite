@@ -458,12 +458,12 @@ cmd_status() {
 
     # Lock
     if lock_is_held "$project" 2>/dev/null; then
-        local lock_file
-        lock_file="$(lock_path "$project")"
+        local lock_pid_file
+        lock_pid_file="$(lock_path "$project")/pid"
         local held_by
-        held_by="$(field_value_plain "$lock_file" "actor" 2>/dev/null || echo "?")"
+        held_by="$(field_value_plain "$lock_pid_file" "actor" 2>/dev/null || echo "?")"
         local held_tool
-        held_tool="$(field_value_plain "$lock_file" "tool" 2>/dev/null || echo "?")"
+        held_tool="$(field_value_plain "$lock_pid_file" "tool" 2>/dev/null || echo "?")"
         printf "  lock:             ${_C_RED:-}locked${_C_RESET:-} by %s (%s)\n" "$held_by" "$held_tool"
     else
         printf "  lock:             ${_C_GREEN:-}unlocked${_C_RESET:-}\n"
@@ -565,17 +565,16 @@ _recover_project() {
     local had_crash=0
 
     # Check for orphaned lock (= crash indicator)
-    if [[ -f "$(lock_path "$project")" ]]; then
+    if [[ -d "$(lock_path "$project")" ]]; then
         if lock_check_orphan "$project"; then
-            local lock_file tool_at_crash
-            lock_file="$(lock_path "$project")"
-            tool_at_crash="$(field_value_plain "$lock_file" "tool" 2>/dev/null || echo "?")"
+            local tool_at_crash
+            tool_at_crash="$(field_value_plain "$(lock_path "$project")/pid" "tool" 2>/dev/null || echo "?")"
 
             printf '\n'
             printf "  ${_C_YELLOW:-}⚠${_C_RESET:-}  ${_C_BOLD:-}%s${_C_RESET:-} — abnormal termination detected\n" "$name"
             printf "  agent: %s\n" "$tool_at_crash"
 
-            rm -f "$(lock_path "$project")"
+            rm -rf "$(lock_path "$project")"
             printf "  ${_C_GREEN:-}✓${_C_RESET:-} orphaned lock cleared\n"
             had_crash=1
             recovered=$((recovered + 1))
@@ -645,9 +644,9 @@ cmd_dashboard() {
         local lock_status
         if lock_is_held "$project" 2>/dev/null; then
             local held_tool
-            held_tool="$(field_value_plain "$(project_campsite_dir "$project")/lock" "tool" 2>/dev/null || echo "?")"
+            held_tool="$(field_value_plain "$(lock_path "$project")/pid" "tool" 2>/dev/null || echo "?")"
             lock_status="${_C_RED:-}locked${_C_RESET:-}($held_tool)"
-        elif [[ -f "$(lock_path "$project")" ]]; then
+        elif [[ -d "$(lock_path "$project")" ]]; then
             lock_status="${_C_YELLOW:-}orphaned${_C_RESET:-}"
         else
             lock_status="${_C_GREEN:-}free${_C_RESET:-}"
@@ -812,21 +811,42 @@ cmd_camp() {
             camp_open_browser "http://localhost:${port}" 2>/dev/null || true
 
             # Watch for state changes and regenerate
+            local _serve_interval="${CAMPSITE_SERVE_INTERVAL:-3}"
             if [[ $legacy -eq 0 && -n "$_phaser_dist_s" ]]; then
-                # Phaser: refresh camp.json in the serve dir every 3 seconds
+                # Phaser: refresh camp.json only when state files change
                 (
+                    local _prev_mtime=""
                     while true; do
-                        sleep 3
-                        cmd_export > /dev/null 2>&1 || true
-                        cp "$camp_d/camp.json" "$serve_dir/camp.json" 2>/dev/null || true
+                        sleep "$_serve_interval"
+                        local _cur_mtime
+                        _cur_mtime="$(
+                            portable_stat_mtime "$camp_d/mission.meta" 2>/dev/null
+                            portable_stat_mtime "$camp_d/participants.tsv" 2>/dev/null
+                            portable_stat_mtime "$camp_d/events.tsv" 2>/dev/null
+                        )"
+                        if [[ "$_cur_mtime" != "$_prev_mtime" ]]; then
+                            _prev_mtime="$_cur_mtime"
+                            cmd_export > /dev/null 2>&1 || true
+                            cp "$camp_d/camp.json" "$serve_dir/camp.json" 2>/dev/null || true
+                        fi
                     done
                 ) &
             else
-                # Legacy: refresh camp-state.json
+                # Legacy: refresh camp-state.json only when state files change
                 (
+                    local _prev_mtime=""
                     while true; do
-                        sleep 3
-                        _camp_write_json "$project" "$camp_d/camp-state.json" 2>/dev/null || true
+                        sleep "$_serve_interval"
+                        local _cur_mtime
+                        _cur_mtime="$(
+                            portable_stat_mtime "$camp_d/mission.meta" 2>/dev/null
+                            portable_stat_mtime "$camp_d/participants.tsv" 2>/dev/null
+                            portable_stat_mtime "$camp_d/events.tsv" 2>/dev/null
+                        )"
+                        if [[ "$_cur_mtime" != "$_prev_mtime" ]]; then
+                            _prev_mtime="$_cur_mtime"
+                            _camp_write_json "$project" "$camp_d/camp-state.json" 2>/dev/null || true
+                        fi
                     done
                 ) &
             fi
@@ -1464,23 +1484,23 @@ cmd_peek() {
     name="$(basename "$project")"
 
     _peek_print() {
-        local lock_file
-        lock_file="$(lock_path "$project")"
+        local lock_pid_file
+        lock_pid_file="$(lock_path "$project")/pid"
 
-        if [[ ! -f "$lock_file" ]]; then
+        if [[ ! -f "$lock_pid_file" ]]; then
             printf '\n'
             printf "  ${_C_DIM:-}%s${_C_RESET:-} — no active session\n\n" "$name"
             return 1
         fi
 
         local actor tool pid host started task terminal
-        actor="$(field_value_plain "$lock_file" "actor" 2>/dev/null || echo "?")"
-        tool="$(field_value_plain "$lock_file" "tool" 2>/dev/null || echo "?")"
-        pid="$(field_value_plain "$lock_file" "pid" 2>/dev/null || echo "?")"
-        host="$(field_value_plain "$lock_file" "host" 2>/dev/null || echo "?")"
-        started="$(field_value_plain "$lock_file" "started-at" 2>/dev/null || echo "?")"
-        task="$(field_value_plain "$lock_file" "task" 2>/dev/null || echo "?")"
-        terminal="$(field_value_plain "$lock_file" "terminal" 2>/dev/null || echo "?")"
+        actor="$(field_value_plain "$lock_pid_file" "actor" 2>/dev/null || echo "?")"
+        tool="$(field_value_plain "$lock_pid_file" "tool" 2>/dev/null || echo "?")"
+        pid="$(field_value_plain "$lock_pid_file" "pid" 2>/dev/null || echo "?")"
+        host="$(field_value_plain "$lock_pid_file" "host" 2>/dev/null || echo "?")"
+        started="$(field_value_plain "$lock_pid_file" "started-at" 2>/dev/null || echo "?")"
+        task="$(field_value_plain "$lock_pid_file" "task" 2>/dev/null || echo "?")"
+        terminal="$(field_value_plain "$lock_pid_file" "terminal" 2>/dev/null || echo "?")"
 
         # Elapsed time
         local elapsed_str="?"

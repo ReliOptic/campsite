@@ -312,13 +312,13 @@ camp_register_sync() {
 
 camp_capture_locked_session_on_save() {
     local project_root="$1" state_changed="${2:-0}"
-    local lock_file
-    lock_file="$(lock_path "$project_root")"
-    [[ -f "$lock_file" ]] || return 0
+    local lock_pid_file
+    lock_pid_file="$(lock_path "$project_root")/pid"
+    [[ -f "$lock_pid_file" ]] || return 0
 
     local tool pid
-    tool="$(field_value_plain "$lock_file" "tool" 2>/dev/null || echo "manual")"
-    pid="$(field_value_plain "$lock_file" "pid" 2>/dev/null || echo "")"
+    tool="$(field_value_plain "$lock_pid_file" "tool" 2>/dev/null || echo "manual")"
+    pid="$(field_value_plain "$lock_pid_file" "pid" 2>/dev/null || echo "")"
     [[ -n "$pid" ]] || return 0
 
     camp_session_finish "$project_root" "$tool" "$pid" "normal" "$state_changed"
