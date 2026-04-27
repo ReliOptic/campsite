@@ -3,18 +3,30 @@
 [[ -n "${_CAMPSITE_COMPAT_LOADED:-}" ]] && return 0
 _CAMPSITE_COMPAT_LOADED=1
 
-detect_platform() {
+_CAMPSITE_PLATFORM=""
+
+# Sets _CAMPSITE_PLATFORM in the current shell context (no subshell).
+# Callers that need the value should call this then read $_CAMPSITE_PLATFORM directly.
+# detect_platform() also prints the value for callers that use $() substitution,
+# but note that subshell callers will not benefit from the cache.
+_campsite_init_platform() {
+    [[ -n "$_CAMPSITE_PLATFORM" ]] && return 0
     case "$(uname -s)" in
-        Darwin) printf 'mac' ;;
+        Darwin) _CAMPSITE_PLATFORM='mac' ;;
         Linux)
             if grep -qi microsoft /proc/version 2>/dev/null; then
-                printf 'wsl'
+                _CAMPSITE_PLATFORM='wsl'
             else
-                printf 'linux'
+                _CAMPSITE_PLATFORM='linux'
             fi
             ;;
-        *) printf 'unknown' ;;
+        *) _CAMPSITE_PLATFORM='unknown' ;;
     esac
+}
+
+detect_platform() {
+    _campsite_init_platform
+    printf '%s' "$_CAMPSITE_PLATFORM"
 }
 
 portable_sha256() {
@@ -32,9 +44,8 @@ portable_sha256() {
 }
 
 detect_device() {
-    local platform
-    platform="$(detect_platform)"
-    case "$platform" in
+    _campsite_init_platform
+    case "$_CAMPSITE_PLATFORM" in
         mac)
             scutil --get LocalHostName 2>/dev/null || hostname -s 2>/dev/null || hostname
             ;;
@@ -54,9 +65,8 @@ detect_device() {
 
 portable_stat_mtime() {
     local file="$1"
-    local platform
-    platform="$(detect_platform)"
-    case "$platform" in
+    _campsite_init_platform
+    case "$_CAMPSITE_PLATFORM" in
         mac)
             stat -f %m "$file" 2>/dev/null
             ;;

@@ -74,6 +74,10 @@ install_files() {
     # Copy libraries
     if [[ -d "$src/lib" ]]; then
         cp "$src"/lib/*.sh "$CAMPSITE_HOME/lib/"
+        # Copy supporting JS assets (e.g. camp-serve-poll.js)
+        for _f in "$src"/lib/*.js; do
+            [[ -f "$_f" ]] && cp "$_f" "$CAMPSITE_HOME/lib/"
+        done
     fi
 
     # Copy built-in adapters

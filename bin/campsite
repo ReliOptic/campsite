@@ -106,6 +106,17 @@ cmd_launcher() {
         fi
     fi
 
+    # Freshness check
+    local launcher_fl=""
+    launcher_fl="$(freshness_level_for_file "$project/status.md" 2>/dev/null || echo "fresh")"
+    if [[ "$launcher_fl" == "stale" ]]; then
+        warn "status.md is $(freshness_label_for_file "$project/status.md")"
+        warn "Run 'campsite sync' to refresh before launching"
+        ui_confirm "Launch anyway?" || exit 1
+    elif [[ "$launcher_fl" == "aging" ]]; then
+        warn "status.md is aging — consider syncing soon"
+    fi
+
     # Lock
     lock_acquire "$project" "${USER:-unknown}" "$agent"
 
@@ -451,7 +462,13 @@ cmd_status() {
     # Operational metadata
     printf "  phase:            %s\n" "$phase"
     printf "  confidence:       %s\n" "$confidence"
-    printf "  freshness:        %s (%s)\n" "$freshness_level" "$freshness_label"
+    local freshness_color=""
+    case "$freshness_level" in
+        fresh)  freshness_color="${_C_GREEN:-}" ;;
+        aging)  freshness_color="${_C_YELLOW:-}" ;;
+        stale)  freshness_color="${_C_YELLOW:-}${_C_BOLD:-}" ;;
+    esac
+    printf "  freshness:        %b%s (%s)%b\n" "$freshness_color" "$freshness_level" "$freshness_label" "${_C_RESET:-}"
     printf "  last-updated:     %s\n" "$last_updated"
     printf "  last-agent:       %s\n" "$last_agent"
     printf "  last-device:      %s\n" "$last_device"
@@ -797,7 +814,17 @@ cmd_camp() {
                 local html_path_legacy
                 html_path_legacy="$(camp_index_path "$project")"
                 if ! grep -q 'camp-live-poll' "$html_path_legacy" 2>/dev/null; then
-                    _portable_sed_i 's|</body>|<script id="camp-live-poll">setInterval(async()=>{try{const r=await fetch("camp-state.json?t="+Date.now());if(!r.ok)return;const d=await r.json();document.getElementById("working-now").textContent=d.working_now;document.getElementById("waiting-on-you").textContent=d.waiting_on_you;document.getElementById("next-move").textContent=d.next_move;document.getElementById("camp-footer").textContent=d.participant_count+" participants in camp";if(d.participants){const sl={bulssi:"불씨",modakbul:"모닥불",deungbul:"등불",yeongi:"연기",jangjak:"장작"};const l=document.getElementById("participant-list");l.innerHTML="";d.participants.forEach(p=>{const e=document.createElement("div");e.className="participant";e.setAttribute("data-state",p.state);const lb=sl[p.state]||p.state;const ic=\x27<svg width="12" height="12"><use href="#ico-\x27+p.state+\x27"/></svg>\x27;let dt=\x27<span class="detail-label">Summary</span>\x27+esc(p.summary);if(p.blocker)dt+=\x27<span class="detail-label">Blocker</span><span class="detail-blocker">\x27+esc(p.blocker)+\x27</span>\x27;if(p.next)dt+=\x27<span class="detail-label">Next action</span><span class="detail-next">\x27+esc(p.next)+\x27</span>\x27;dt+=\x27<span class="detail-label">Resume</span><span class="detail-resume">\x27+esc(p.tool)+" in "+esc(p.terminal)+\x27</span>\x27;e.innerHTML=\x27<div class="participant-header"><span class="participant-name">\x27+esc(p.name)+\x27</span><span class="state-chip state-\x27+p.state+\x27">\x27+ic+lb+\x27</span></div><div class="participant-detail">\x27+dt+\x27</div>\x27;e.onclick=()=>{const dd=e.querySelector(".participant-detail");dd.style.display=dd.style.display==="block"?"none":"block"};l.appendChild(e)})}}catch(e){}},3000)</script></body>|' "$html_path_legacy"
+                    local _poll_js _poll_js_minified
+                    _poll_js="$(cat "$CAMPSITE_LIB/camp-serve-poll.js" 2>/dev/null)" || _poll_js=""
+                    # Minify for single-line sed injection: collapse whitespace between tokens
+                    _poll_js_minified="$(printf '%s' "$_poll_js" | tr '\n' ' ' | sed 's/  */ /g')"
+                    printf '%s\n' "</body>" >> /dev/null  # ensure newline safety
+                    # Append script block directly (avoids sed single-line limitation with large JS)
+                    local _tmp_html
+                    _tmp_html="$(mktemp)"
+                    sed 's|</body>||' "$html_path_legacy" > "$_tmp_html"
+                    printf '<script id="camp-live-poll">%s</script>\n</body>\n' "$_poll_js_minified" >> "$_tmp_html"
+                    mv "$_tmp_html" "$html_path_legacy"
                 fi
 
                 serve_dir="$camp_d"
@@ -1593,7 +1620,19 @@ cmd_go() {
         for i in "${!mru_names[@]}"; do
             local rel_time=""
             [[ -n "${mru_times[$i]}" ]] && rel_time="$(_history_relative_time "${mru_times[$i]}" 2>/dev/null || echo "?")"
-            printf "  ${_C_DIM:-}%2d${_C_RESET:-}  %-20s  (%s)\n" "$idx" "${mru_names[$i]}" "$rel_time"
+            local mru_project_path
+            mru_project_path="$(history_resolve_project_path "${mru_names[$i]}" 2>/dev/null || true)"
+            local mru_fl=""
+            local mru_freshness_suffix=""
+            if [[ -n "$mru_project_path" && -f "$mru_project_path/status.md" ]]; then
+                mru_fl="$(freshness_level_for_file "$mru_project_path/status.md" 2>/dev/null || echo "fresh")"
+                if [[ "$mru_fl" == "stale" ]]; then
+                    mru_freshness_suffix=" ${_C_YELLOW:-}[STALE]${_C_RESET:-}"
+                elif [[ "$mru_fl" == "aging" ]]; then
+                    mru_freshness_suffix=" ${_C_DIM:-}(aging)${_C_RESET:-}"
+                fi
+            fi
+            printf "  ${_C_DIM:-}%2d${_C_RESET:-}  %-20s  (%s)%b\n" "$idx" "${mru_names[$i]}" "$rel_time" "$mru_freshness_suffix"
             idx=$((idx + 1))
         done
         printf '\n'
@@ -1617,7 +1656,23 @@ cmd_go() {
              "Check workspace path with 'campsite dashboard'"
     }
 
-    # If --sync requested, compile first
+    # Freshness check after path resolution
+    local go_fl=""
+    go_fl="$(freshness_level_for_file "$resolved_path/status.md" 2>/dev/null || echo "fresh")"
+    if [[ "$go_fl" == "stale" ]]; then
+        warn "status.md is $(freshness_label_for_file "$resolved_path/status.md") — project is stale"
+        if [[ $do_sync -eq 0 ]]; then
+            if ui_confirm "Run sync first? (recommended for stale projects)"; then
+                do_sync=1
+            else
+                ui_confirm "Continue without sync?" || return 1
+            fi
+        fi
+    elif [[ "$go_fl" == "aging" ]]; then
+        warn "status.md is aging — consider running 'campsite sync' soon"
+    fi
+
+    # If --sync requested or confirmed, compile first
     if [[ $do_sync -eq 1 ]]; then
         (cd "$resolved_path" && cmd_sync)
     fi

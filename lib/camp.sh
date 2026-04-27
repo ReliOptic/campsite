@@ -509,7 +509,7 @@ camp_render() {
     }
     * { box-sizing: border-box; margin: 0; }
     body { min-height: 100vh; font-family: Inter, system-ui, sans-serif; color: var(--text); background: var(--bg); overflow-x: hidden; }
-    .camp { max-width: 640px; margin: 0 auto; padding: 48px 24px; position: relative; z-index: 1; }
+    .camp { max-width: 640px; margin: 0 auto; padding: 48px 24px; position: relative; z-index: 5; }
 
     /* Header — project name only */
     .camp-header { margin-bottom: 40px; }
@@ -587,11 +587,22 @@ camp_render() {
     /* Active participant pulse */
     .participant[data-state="modakbul"] { box-shadow: inset 0 0 0 rgba(255,159,74,0); animation: pulse 3s ease-in-out infinite; }
 
+    /* Environment scene */
+    .ground { position: fixed; bottom: 0; left: 0; right: 0; height: 15vh;
+      background: linear-gradient(to top, #0d1f0d, #1a3d1a); z-index: 1; pointer-events: none; }
+    .forest { position: fixed; bottom: 15vh; left: 0; right: 0; z-index: 2; pointer-events: none; }
+    .ground-props { position: fixed; bottom: 0; left: 0; right: 0; height: 15vh; z-index: 3; pointer-events: none; }
+    /* Stones around campfire */
+    .stone { position: absolute; border-radius: 50%; background: #2a3a2a; }
+    /* Grass blades */
+    .grass { position: absolute; bottom: 14vh; width: 1px; background: linear-gradient(to top, #1a3d1a, #2d5a2d); }
+
     /* Animations */
     @keyframes twinkle { from { opacity: 0.6; } to { opacity: 1; } }
     @keyframes flicker { 0% { opacity: 0.85; } 50% { opacity: 1; } 100% { opacity: 0.9; } }
     @keyframes drift { from { transform: translateY(-50%); } to { transform: translateY(calc(-50% - 2px)); } }
     @keyframes pulse { 0%,100% { box-shadow: inset 0 0 0 rgba(255,159,74,0); } 50% { box-shadow: inset 0 0 12px rgba(255,159,74,0.04); } }
+    @keyframes sway { 0%,100% { transform: skewX(0deg); } 50% { transform: skewX(2deg); } }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
   </style>
 </head>
@@ -640,6 +651,31 @@ camp_render() {
     </symbol>
   </svg>
   <div class="sky" id="sky"><div class="moon-haze"></div></div>
+
+  <!-- Ground layer -->
+  <div class="ground"></div>
+
+  <!-- Forest silhouette — left edge -->
+  <svg class="forest" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 30" preserveAspectRatio="none" style="width:32vw;height:22vh;position:fixed;bottom:14vh;left:0;z-index:2;">
+    <polygon points="0,30 6,10 12,30" fill="#1a2e1a"/>
+    <polygon points="8,30 16,6 24,30" fill="#162614"/>
+    <polygon points="18,30 26,12 34,30" fill="#1a2e1a"/>
+    <polygon points="28,30 34,16 40,30" fill="#162614"/>
+    <polygon points="2,30 8,18 14,30" fill="#1e331e" opacity="0.7"/>
+  </svg>
+
+  <!-- Forest silhouette — right edge -->
+  <svg class="forest" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 30" preserveAspectRatio="none" style="width:32vw;height:22vh;position:fixed;bottom:14vh;right:0;z-index:2;">
+    <polygon points="60,30 66,16 72,30" fill="#162614"/>
+    <polygon points="68,30 76,10 84,30" fill="#1a2e1a"/>
+    <polygon points="76,30 84,14 92,30" fill="#162614"/>
+    <polygon points="84,30 92,8 100,30" fill="#1a2e1a"/>
+    <polygon points="86,30 92,18 98,30" fill="#1e331e" opacity="0.7"/>
+  </svg>
+
+  <!-- Ground props: stones + grass -->
+  <div class="ground-props" id="ground-props"></div>
+
   <div class="camp">
     <header class="camp-header">
       <div class="camp-name" id="camp-name"></div>
@@ -795,6 +831,36 @@ EOF
         s.style.animationDelay = (Math.random() * 4) + "s";
         s.style.animation = "twinkle " + (4 + Math.random()*4).toFixed(1) + "s ease-in-out " + (Math.random()*4).toFixed(1) + "s infinite alternate";
         sky.appendChild(s);
+      }
+    })();
+
+    // Generate ground props: stones + grass blades
+    (function() {
+      const props = document.getElementById("ground-props");
+      if (!props) return;
+      // Stones clustered near center (campfire area)
+      const stoneDefs = [
+        {l:"44%",b:"10vh",w:"10px",h:"7px"}, {l:"48%",b:"8vh",w:"7px",h:"5px"},
+        {l:"52%",b:"9vh",w:"9px",h:"6px"}, {l:"56%",b:"11vh",w:"6px",h:"4px"},
+        {l:"42%",b:"12vh",w:"5px",h:"4px"}
+      ];
+      stoneDefs.forEach(function(def) {
+        const st = document.createElement("div");
+        st.className = "stone";
+        st.style.left = def.l; st.style.bottom = def.b;
+        st.style.width = def.w; st.style.height = def.h;
+        props.appendChild(st);
+      });
+      // Grass blades scattered across ground
+      for (var i = 0; i < 28; i++) {
+        const g = document.createElement("div");
+        g.className = "grass";
+        const h = 6 + Math.random() * 10;
+        g.style.left = (Math.random() * 100) + "vw";
+        g.style.height = h + "px";
+        g.style.opacity = 0.5 + Math.random() * 0.4;
+        g.style.animation = "sway " + (3 + Math.random() * 3).toFixed(1) + "s ease-in-out " + (Math.random() * 2).toFixed(1) + "s infinite";
+        props.appendChild(g);
       }
     })();
   </script>
