@@ -467,7 +467,7 @@ camp_render() {
     # Last activity timestamp for "last seen" display
     local last_activity_iso=""
     if [[ -f "$events_file" ]]; then
-        last_activity_iso="$(tail -1 "$events_file" | cut -f1)"
+        last_activity_iso="$(awk 'NR>1{last=$1} END{print last}' "$events_file")"
     fi
     local last_activity_html=""
     if [[ -n "$last_activity_iso" ]]; then
