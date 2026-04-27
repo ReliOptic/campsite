@@ -4,7 +4,7 @@ CURDIR := $(shell pwd)
 
 SHELL_FILES := bin/campsite $(wildcard lib/*.sh) $(wildcard adapters/*.sh)
 
-.PHONY: help install uninstall dev test test-unit test-integration test-hybrid lint check
+.PHONY: help install uninstall dev test test-unit test-integration test-hybrid qa lint check
 
 help:
 	@printf '%s\n' \
@@ -20,6 +20,7 @@ help:
 		"  make test-unit   Run unit tests only" \
 		"  make test-integration  Run integration tests only" \
 		"  make test-hybrid Run the hybrid smoke harness + review guidance" \
+		"  make qa          Run the bats-free North Star QA harness" \
 		"  make lint        Run shellcheck on all shell files" \
 		"  make check       Run lint + test"
 
@@ -103,6 +104,10 @@ test-smoke:
 	@printf '%s\n' "Running smoke tests..."
 	@bash bin/campsite --version
 	@printf '\033[32m%s\033[0m\n' "Smoke tests passed"
+
+qa:
+	@printf '%s\n' "Running North Star QA harness..."
+	@bash scripts/qa-northstar.sh
 
 test-hybrid:
 	@printf '%s\n' "Running hybrid smoke harness..."
