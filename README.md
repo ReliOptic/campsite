@@ -114,18 +114,79 @@ AI가 만든 것을 사람이 판단하는 중심.
 | 명령어 | 설명 |
 |---|---|
 | `campsite` | 프로젝트 선택 + AI 실행 |
+| `campsite --force` | 위와 같지만 freshness 게이트 무시 |
 | `campsite setup` | 처음 한 번 설정 |
 | `campsite init [path]` | 새 프로젝트 만들기 |
 | `campsite sync` | 프로젝트 상태 → AI 컨텍스트 변환 |
 | `campsite save` | 작업 끝내기 |
 | `campsite save --push` | 끝내고 git push까지 |
 | `campsite status` | 현재 상태 요약 |
+| `campsite hud` | 모든 캠프의 살아있는 상태판 (폴링) |
+| `campsite hud --line` | tmux status-line 용 한 줄 |
+| `campsite hud --json` | 다른 도구로 넘길 JSON 스냅샷 |
 | `campsite camp render` | 캠프 화면 열기 |
 | `campsite camp serve` | 실시간 캠프 서버 |
 | `campsite camp mission` | 미션 설정 (대화형) |
 | `campsite validate` | 구조 점검 |
 | `campsite recover` | 고아 세션 정리 |
 | `campsite dashboard` | 전체 프로젝트 목록 |
+
+---
+
+## 여러 캠프 한눈에 — `campsite hud`
+
+캠프 3개 이상 돌리고 있으면 "지금 뭐가 어디까지 됐지?" 우왕좌왕하는 시간이 의외로 깁니다.
+HUD 가 그걸 죽입니다.
+
+```bash
+campsite hud              # 풀스크린 폴링 (1초마다, alt-screen)
+campsite hud --once       # 한 번만 출력하고 종료
+campsite hud --line       # tmux status-line 용 한 줄
+campsite hud --json       # JSON 스냅샷
+campsite hud --interval=2 # 폴링 간격 조절 (초)
+```
+
+각 캠프마다: 불 상태 글리프, 지금 무엇을 하고 있는지 (active agent + uptime, 또는 idle 시간), 미션, 락 여부, freshness 로 깎인 effective confidence.
+
+### tmux 통합 (한 줄)
+
+```tmux
+set -g status-interval 2
+set -g status-right '#(campsite hud --line)'
+```
+
+이러면 어떤 창에 있든 위쪽에 항상 모든 캠프 상태가 떠 있습니다.
+
+```
+● campsite/claude·1m12s · ◌ foo/idle 12m · ⚠ bar/exit=1 · ○ baz/idle 4h
+```
+
+---
+
+## 오래 떠나있다 돌아온다면 — Freshness gate
+
+캠프의 약속은 *recovery-first* 입니다.
+3일 만에 돌아왔는데 status.md / handoff.md 가 낡았다면, agent 가 썩은 컨텍스트 위에서 silent 하게 작업을 시작하면 안 됩니다.
+
+기본 동작 (정책: `strict`):
+
+| 캠프 상태 | 동작 |
+|---|---|
+| **fresh** (1일 이내) | 그냥 시작 |
+| **aging** (1~2일) | 경고 + 진행 |
+| **stale** (2일 이상) | **실행 거부** (rc=2) |
+
+stale 일 때 "그래도 시작할게요" 하려면 의식적으로 override:
+
+```bash
+campsite --force                          # 일회성 bypass
+CAMPSITE_FORCE=1 campsite                  # 환경변수로 bypass
+CAMPSITE_FRESHNESS_POLICY=warn campsite    # block 대신 warn 으로
+CAMPSITE_FRESHNESS_POLICY=off  campsite    # 게이트 자체를 끔
+CAMPSITE_STALE_DAYS=7 campsite             # stale 기준을 7일로
+```
+
+stated confidence (status.md 의 `confidence: high`) 도 freshness 가 깎습니다 — aging 이면 한 단계, stale 이면 `low` 로 floor. 이 effective confidence 는 launcher 목록 / `campsite status` / 세션 시작 배너에 모두 보입니다 (예: `confidence: high → low (degraded by stale state)`).
 
 ---
 
@@ -171,6 +232,17 @@ CLAUDE.md는 건드리지 않아요.
 - [Reference](docs/reference.md) — CLI 레퍼런스
 - [Design System](docs/DESIGN.md) — 시각 디자인 시스템
 - [Family Look](docs/family-look-spec.md) — Camp/Focus 통일 규칙
+
+---
+
+## 개발
+
+```bash
+make test         # 전체 테스트 (bats 필요)
+make qa           # bats 없이도 돌아가는 통합 QA 하니스 (~1.5초)
+make test-hybrid  # 실제 git push까지 포함한 smoke
+make lint         # shellcheck
+```
 
 ---
 
