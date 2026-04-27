@@ -23,70 +23,199 @@ Campsite를 열면:
 
 ## 설치
 
+### 빠른 방법 (curl)
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ReliOptic/campsite/main/install.sh | bash
 ```
 
-새 터미널을 열거나:
+이 한 줄이 다음을 합니다:
+- `~/.campsite/` 에 binary + libraries 설치
+- `~/.bashrc` / `~/.zshrc` / `~/.profile` 에 PATH + shell wrapper 자동 추가
+- (wrapper 는 `campsite go` 가 같은 shell 에서 `cd` 하기 위해 필요)
+
+### git clone 으로 설치
+
+```bash
+git clone https://github.com/ReliOptic/campsite.git
+cd campsite
+./install.sh
+```
+
+### 특정 버전 고정
+
+```bash
+CAMPSITE_VERSION=v0.2.0 curl -fsSL https://raw.githubusercontent.com/ReliOptic/campsite/main/install.sh | bash
+```
+
+### 다른 위치에 설치
+
+```bash
+CAMPSITE_HOME="$HOME/tools/campsite" ./install.sh
+```
+
+### 설치 확인
+
+새 터미널을 열거나, 현재 shell 에서:
 
 ```bash
 export CAMPSITE_HOME="$HOME/.campsite"
 export PATH="$CAMPSITE_HOME/bin:$PATH"
+
+campsite --version
+```
+
+### 의존성
+
+- bash 3.2 이상 (macOS 기본 포함)
+- `sed`, `awk`, `git`
+- `sha256sum` / `shasum` / `openssl` 중 하나 (대부분 기본)
+
+### 제거
+
+```bash
+make uninstall    # repo 디렉토리에서
+# 또는 그냥
+rm -rf ~/.campsite
+```
+
+`~/.campsite/user/config.sh` 는 보존됩니다 (재설치 시 설정 유지).
+
+---
+
+## 사용법
+
+### 처음 한 번 — Day 1
+
+#### 1. 워크스페이스 정하기
+
+여러 프로젝트를 한 곳에서 관리할 폴더를 정합니다.
+
+```bash
+campsite workspace set ~/projects
+```
+
+#### 2. 프로젝트 캠프로 만들기
+
+```bash
+cd ~/projects/my-app
+campsite init
+```
+
+`status.md`, `handoff.md`, `decisions.md`, `README.md` 가 생깁니다.
+이게 캠프의 *진짜* 상태 — AI 도 사람도 같은 파일을 읽습니다.
+
+#### 3. 미션 적기
+
+`status.md` 와 `handoff.md` 를 열어서 채우세요:
+
+```markdown
+# Status
+- phase: building
+- confidence: high
+
+# Handoff
+- task: 결제 모듈 리팩토링
+```
+
+이 두 파일이 모든 AI 에이전트가 컨텍스트로 읽는 source of truth.
+CLAUDE.md / AGENTS.md 같은 도구별 파일 따로 안 만들어도 됩니다.
+
+#### 4. AI 와 함께 작업 시작
+
+```bash
+campsite
+```
+
+프로젝트 목록 → AI 에이전트 (claude/codex/gemini/...) → 자동 launch.
+선택한 에이전트가 컴파일된 컨텍스트를 가지고 시작합니다.
+
+#### 5. 끝내고 저장
+
+```bash
+campsite save           # 락 풀고 정리
+campsite save --push    # git checkpoint commit + push까지
 ```
 
 ---
 
-## 첫 5분
-
-### 1. 캠프 만들기
+### 다음 날 돌아왔을 때 — Day N
 
 ```bash
 campsite
 ```
 
-처음 실행하면 자동으로 안내가 시작됩니다.
-프로젝트 경로만 알려주면 끝.
+만약 `status.md` / `handoff.md` 가 너무 오래됐으면 (기본 2일 이상) campsite 가 **실행을 거부**합니다:
 
-### 2. 프로젝트 시작
+```
+◎  camp state is stale — refusing to launch on rotten context.
+   status.md: 5d old   handoff.md: 5d old
 
-```bash
-campsite init ~/projects/my-app
-cd ~/projects/my-app
+recovery options:
+  - update status.md / handoff.md, then campsite sync
+  - skip the gate this once: campsite --force
+  - relax the policy: CAMPSITE_FRESHNESS_POLICY=warn (or off)
 ```
 
-`status.md`와 `handoff.md`가 생깁니다.
-지금 뭘 하고 있는지, 다음에 뭘 할 건지 적어주세요.
+이게 **recovery-first** 의 실제 모습 — 썩은 컨텍스트로 silent launch 안 함.
 
-### 3. 작업 시작
+상태가 fresh 하면 그냥 launcher 가 뜨고, "이전에 어디까지 했더라" 같은 정보가 batner 에 다 보입니다:
 
-```bash
-campsite
+```
+my-app │ claude │ macbook
+phase: building
+confidence: high
+next: 결제 모듈 리팩토링
 ```
 
-프로젝트를 고르고, AI agent를 고르면 바로 시작.
+---
 
-### 4. 캠프 보기
+### 여러 캠프 동시에 — HUD
+
+작업 중 다른 창에서 모든 캠프 상태를 보려면:
 
 ```bash
-campsite camp render
+campsite hud         # 풀스크린 폴링 (1Hz, alt-screen)
+campsite hud --once  # 한 번만 출력
 ```
 
-브라우저에 캠프가 열립니다.
-미션, 진행 상태, 참여자가 한 화면에.
+tmux 사용자라면 status-line 에 박을 수 있습니다 (`~/.tmux.conf`):
 
-실시간으로 보고 싶다면:
+```tmux
+set -g status-interval 2
+set -g status-right '#(campsite hud --line)'
+```
+
+이러면 tmux 의 모든 창 위에 항상 모든 캠프의 상태가 떠 있습니다:
+
+```
+● my-app/claude·12m · ◌ blog/idle 1h · ⚠ api/exit=1
+```
+
+---
+
+### 자주 쓰는 흐름
 
 ```bash
+# 다른 프로젝트로 점프 (cd 까지 됨, 옵션 --sync 로 컨텍스트 갱신)
+campsite go my-app
+campsite go --sync
+
+# 현재 캠프 상태만 확인 (실행 안 함)
+campsite status
+
+# 다른 창에서 실시간으로 캠프 보기 (브라우저)
 campsite camp serve
+
+# 모든 캠프 일람
+campsite dashboard
+
+# 충돌난 락 / 좀비 세션 정리
+campsite recover
+
+# 구조 점검 (status.md 형식, freshness 등)
+campsite validate
 ```
-
-### 5. 끝내기
-
-```bash
-campsite save
-```
-
-"좋아요! 다음에 돌아오면 바로 시작할 수 있어요."
 
 ---
 
