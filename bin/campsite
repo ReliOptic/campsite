@@ -34,6 +34,7 @@ source "$CAMPSITE_LIB/camp-assets.sh"
 source "$CAMPSITE_LIB/collector.sh"
 source "$CAMPSITE_LIB/agent.sh"
 source "$CAMPSITE_LIB/firestate.sh"
+source "$CAMPSITE_LIB/hud.sh"
 
 # --- Load defaults ---
 if [[ -f "$CAMPSITE_ROOT/config/defaults.sh" ]]; then
@@ -69,6 +70,7 @@ usage:
   campsite validate       Structure + freshness verification
   campsite recover        Clear orphaned locks + stale files
   campsite dashboard      All projects overview
+  campsite hud            Always-alive multi-camp status (polling; --once/--line/--json)
   campsite camp           Camp state commands and local recovery-first scene
   campsite camp render    Render camp in browser (Phaser storyworld when built, legacy HTML otherwise)
   campsite camp render --legacy   Force legacy HTML renderer
@@ -683,6 +685,50 @@ _recover_project() {
     fi
 
     return $(( recovered > 0 ? 0 : 1 ))
+}
+
+# --- campsite hud — always-alive top strip / multi-camp HUD ---
+# Modes:
+#   campsite hud                 polling full-screen HUD (1Hz)
+#   campsite hud --once          one full render, then exit
+#   campsite hud --line          single tmux-friendly line, then exit
+#   campsite hud --json          JSON snapshot, then exit
+#   campsite hud --interval=N    polling interval (default 1)
+cmd_hud() {
+    local mode='loop'
+    local interval=1
+    for arg in "$@"; do
+        case "$arg" in
+            --once)         mode='once' ;;
+            --line)         mode='line' ;;
+            --json)         mode='json' ;;
+            --interval=*)   interval="${arg#--interval=}" ;;
+            -h|--help)
+                cat <<EOF
+campsite hud — always-alive multi-camp status
+
+usage:
+  campsite hud                  polling full-screen HUD
+  campsite hud --once           render once and exit
+  campsite hud --line           single line (for tmux status-line)
+  campsite hud --json           JSON snapshot
+  campsite hud --interval=N     polling interval, seconds (default: 1)
+
+tmux example:
+  set -g status-interval 2
+  set -g status-right '#(campsite hud --line)'
+EOF
+                return 0 ;;
+            *) fail "unknown flag for campsite hud: $arg" "Run 'campsite hud --help'" ;;
+        esac
+    done
+
+    case "$mode" in
+        line) hud_render_line; printf '\n' ;;
+        json) hud_render_json ;;
+        once) hud_render_full ;;
+        loop) hud_loop "$interval" ;;
+    esac
 }
 
 # --- campsite dashboard ---
@@ -1844,6 +1890,9 @@ main() {
             ;;
         dashboard)
             shift; cmd_dashboard "$@"
+            ;;
+        hud)
+            shift; cmd_hud "$@"
             ;;
         camp)
             shift; cmd_camp "$@"

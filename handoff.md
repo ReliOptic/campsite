@@ -2,8 +2,8 @@
 
 ## Next Action
 
-- task: 디자인 에셋 생성 — design/image_prompt.md 프롬프트로 첫 6종 pixel art 생성 후 design/export/에 배치
-- fallback-task: interactive launcher/setup TTY 검증 (freshness → launcher confidence 는 wired)
+- task: HUD 확장 — collector 가 잡은 file_activity / commit / agent event 를 plain-language activity 한 줄로 번역해서 HUD 에 노출 (현재는 agent name + uptime 만)
+- fallback-task: 디자인 에셋 생성 — design/image_prompt.md 프롬프트로 첫 6종 pixel art 생성, interactive launcher/setup TTY 검증
 - priority: medium
 - estimated-scope: medium
 - entry-point: design/image_prompt.md (프롬프트), design/export/ (결과물), lib/camp-assets.sh (파이프라인)
@@ -44,3 +44,4 @@ North Star (recovery-first AI workspace) 가 이제 실제로 동작:
 | 2026-04-03 | claude-opus | Replaced dashboard camp render with return-first minimal view, fixed bash read empty-field bug via awk, added camp serve live-poll selector update | Camp render is now a functional return-first view |
 | 2026-04-04 | claude-opus | Built design asset layers: CSS night sky + stars, SVG sprite sheet (6 icons), campfire glow, corner accents, animations, asset pipeline (lib/camp-assets.sh), serve JSON with participants, live-poll participant refresh | Camp render has visual identity matching product vision |
 | 2026-04-27 | claude-opus | Wired freshness signal into launcher: project_freshness_level / effective_confidence / freshness_gate_action helpers, stale-state launch block with --force and CAMPSITE_FRESHNESS_POLICY override, effective confidence in list/status/banner | Recovery-first North Star is now load-bearing — stale camp state cannot silently launch agents |
+| 2026-04-27 | claude-opus | Built `campsite hud` always-alive multi-camp HUD: lib/hud.sh with line/full/json/loop renderers; alternate-screen polling, calm tick animation, tmux status-line via `campsite hud --line`. Surfaces fire-state glyph + current activity + effective confidence + mission per camp | "여러 작업 우왕좌왕" 시간을 죽이는 단일 진실. tmux status-line / 별도 패널 / standalone 모두에서 동작 |

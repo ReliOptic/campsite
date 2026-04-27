@@ -47,6 +47,7 @@
 - `install.sh` no longer falsely requires bash 4+ (actual minimum: bash 3.2).
 - CI now runs `make test-hybrid`.
 - Freshness now drives the launcher: stale state blocks (with `--force` / `CAMPSITE_FRESHNESS_POLICY=warn|off` overrides), aging warns, and stated confidence is degraded by freshness in the launcher list, status output, and session banner.
+- `campsite hud` always-alive multi-camp HUD: polling full-screen render (default), `--once`, `--line` (tmux status-line), `--json` (machine-readable). Each camp shows fire-state glyph, current activity (active agent + uptime, or idle age), effective confidence, and current mission.
 
 ## What Does Not Work Yet
 
