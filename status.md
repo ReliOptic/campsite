@@ -4,7 +4,7 @@
 
 - phase: building
 - confidence: high
-- last-updated: 2026-04-28
+- last-updated: 2026-04-29
 - last-agent: claude-sonnet
 - last-device: Kiwonui-MacBookAir
 
@@ -54,11 +54,14 @@
 - Phase 4: `campsite camp message` (send/reply/list/flag/resolve), role/stance on participants, unresolved thread escalation in overview and dashboard.
 - HTML camp dashboard now shows Threads panel with amber highlight for unresolved, reply indentation, and resolve command hint.
 - `campsite camp message` has 7 integration tests: send, reply, list, list --unresolved, resolve, flag, overview MSGS line. make check 172 unit + 45 integration = 217 total, all passing.
+- External design brief (`design/design-brief.md`), Active Camp copy(KR/EN), and v1.0 completion roadmap(`docs/completion-roadmap.md`) committed.
+- Claude Design handoff bundle landed at `design/handoff/2026-04-29-claude-design/` (13 files: HTML/CSS/JSX prototypes for F-1/F-2/F-3 + design system reference cards). Token HEX values match design brief §5.1 exactly. Standalone preview launcher (`start-preview.sh`) verified HTTP 200 for entry HTML + tokens.css + active-camp.jsx. Integration plan documented in `INTEGRATION.md` with 6-step migration path.
 
 ## What Does Not Work Yet
 
 - No generated pixel art assets — `design/export/` is empty, Phaser storyworld is inactive.
 - Participant `last_seen` displays raw ISO 8601 timestamps (relative time conversion not implemented).
+- Handoff design system not yet adopted by `lib/camp.sh:506 camp_render()`. Migration plan in `design/handoff/2026-04-29-claude-design/INTEGRATION.md` Steps 1-6.
 
 ## Blockers
 

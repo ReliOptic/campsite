@@ -1,0 +1,259 @@
+/* ============================================================
+   Campsite — Pixel Art (CSS box-shadow grid technique)
+   All sprites use 4px pixel cells. No SVG, no PNG — pure DOM.
+   Inspired by Dave the Diver HD pixel density.
+   ============================================================ */
+
+.px-stage {
+  position: relative;
+  display: inline-block;
+  font-size: 0;
+  line-height: 0;
+}
+.px-stage > .px {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  top: 0;
+  left: 0;
+}
+
+/* ====== Campfire (mission hearth) ======
+   Built as overlapping pixel layers. Sized for visual hero. */
+.campfire {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  filter: drop-shadow(0 0 24px var(--modakbul-glow));
+}
+.campfire .logs {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 16px;
+  background:
+    linear-gradient(180deg, transparent 0 4px, #5a3a22 4px 8px, #3e2614 8px 12px, #2a1a0d 12px 16px);
+  box-shadow:
+    -28px -2px 0 0 #4a2e1c,
+    28px -2px 0 0 #4a2e1c,
+    -36px 0 0 0 #2a1a0d,
+    36px 0 0 0 #2a1a0d;
+}
+.campfire .log-stripe {
+  position: absolute;
+  bottom: 4px;
+  left: 16px;
+  width: 64px;
+  height: 4px;
+  background: #6e4628;
+}
+.campfire .embers {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 56px;
+  height: 8px;
+  background: radial-gradient(ellipse at center, #ff8a3d 0%, #c93f0e 70%, transparent 100%);
+}
+.campfire .flame {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 56px;
+}
+.campfire .flame::before,
+.campfire .flame::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+}
+/* outer flame */
+.campfire .flame::before {
+  left: 0;
+  width: 40px;
+  height: 56px;
+  background:
+    radial-gradient(ellipse 20px 30px at 50% 70%, #ff8a3d 0%, #ff8a3d 40%, transparent 70%),
+    radial-gradient(ellipse 14px 20px at 50% 40%, #ffc66b 0%, transparent 70%);
+  clip-path: polygon(
+    20% 100%, 8% 70%, 16% 50%, 8% 30%, 24% 22%, 32% 6%, 50% 18%, 68% 6%, 76% 22%, 92% 30%, 84% 50%, 92% 70%, 80% 100%
+  );
+  animation: flicker 2.1s ease-in-out infinite;
+}
+.campfire .flame::after {
+  left: 8px;
+  bottom: 4px;
+  width: 24px;
+  height: 32px;
+  background: linear-gradient(180deg, #fff4cc 0%, #ffd56b 50%, #ff8a3d 100%);
+  clip-path: polygon(50% 0%, 82% 30%, 64% 60%, 82% 100%, 18% 100%, 36% 60%, 18% 30%);
+  animation: flicker 2.1s ease-in-out infinite reverse;
+}
+.campfire .spark {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #ffd56b;
+  border-radius: 0;
+  animation: spark-rise 3.2s linear infinite;
+}
+.campfire .spark.s1 { left: 30px; bottom: 40px; animation-delay: 0s; }
+.campfire .spark.s2 { left: 56px; bottom: 32px; animation-delay: 1.1s; }
+.campfire .spark.s3 { left: 44px; bottom: 56px; animation-delay: 2.2s; }
+
+@keyframes flicker {
+  0%, 100% { transform: translateX(-50%) scaleY(1) scaleX(1); opacity: 1; }
+  25% { transform: translateX(-50%) scaleY(1.05) scaleX(0.96); opacity: 0.92; }
+  50% { transform: translateX(-50%) scaleY(0.96) scaleX(1.04); opacity: 1; }
+  75% { transform: translateX(-50%) scaleY(1.03) scaleX(0.98); opacity: 0.95; }
+}
+@keyframes spark-rise {
+  0% { transform: translate(0, 0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 0.6; }
+  100% { transform: translate(-12px, -56px); opacity: 0; }
+}
+
+/* ====== Smaller campfire variants for fire-states ====== */
+.fire-mini { position: relative; width: 32px; height: 32px; }
+.fire-mini .core {
+  position: absolute;
+  inset: auto 50% 0 50%;
+  transform: translate(-50%, 0);
+  width: 16px;
+  height: 20px;
+  clip-path: polygon(50% 0%, 80% 30%, 70% 60%, 90% 100%, 10% 100%, 30% 60%, 20% 30%);
+}
+
+.fire-mini[data-state="bulssi"] { filter: drop-shadow(0 0 6px rgba(201, 122, 58, 0.5)); }
+.fire-mini[data-state="bulssi"] .core {
+  background: linear-gradient(180deg, #f3a259 0%, #c97a3a 60%, #6e3a1c 100%);
+  width: 10px; height: 14px;
+  animation: flicker 2.4s ease-in-out infinite;
+}
+.fire-mini[data-state="modakbul"] { filter: drop-shadow(0 0 12px var(--modakbul-glow)); }
+.fire-mini[data-state="modakbul"] .core {
+  background: linear-gradient(180deg, #fff4cc 0%, #ffc66b 35%, #ff8a3d 70%, #c93f0e 100%);
+  animation: flicker 1.7s ease-in-out infinite;
+}
+.fire-mini[data-state="deungbul"] { filter: drop-shadow(0 0 10px rgba(243, 201, 105, 0.55)); }
+.fire-mini[data-state="deungbul"] .core {
+  background: linear-gradient(180deg, #fff0b0 0%, #f3c969 60%, #b88a2c 100%);
+  width: 12px; height: 18px;
+  clip-path: polygon(20% 0, 80% 0, 100% 50%, 80% 100%, 20% 100%, 0 50%);
+  animation: pulse-soft 3s ease-in-out infinite;
+}
+.fire-mini[data-state="yeongi"] {
+  filter: drop-shadow(0 0 6px rgba(75, 224, 255, 0.25));
+}
+.fire-mini[data-state="yeongi"] .core {
+  background:
+    radial-gradient(ellipse 8px 12px at 50% 60%, var(--yeongi-edge) 0%, transparent 70%),
+    linear-gradient(180deg, #8a9eb4 0%, #6f8aa8 60%, #3e4d60 100%);
+  width: 14px; height: 22px;
+  clip-path: polygon(50% 0%, 70% 25%, 50% 45%, 75% 65%, 50% 85%, 65% 100%, 35% 100%, 25% 65%, 50% 45%, 30% 25%);
+  animation: smoke-drift 4s ease-in-out infinite;
+}
+.fire-mini[data-state="jangjak"] { filter: drop-shadow(0 0 4px rgba(138, 195, 154, 0.35)); }
+.fire-mini[data-state="jangjak"] .core {
+  width: 24px; height: 8px;
+  background:
+    linear-gradient(180deg, #6e4628 0%, #4a2e1c 100%);
+  clip-path: polygon(0 30%, 12% 0, 100% 0, 100% 70%, 88% 100%, 0 100%);
+  border-top: 2px solid var(--jangjak);
+  animation: none;
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  50% { opacity: 0.85; transform: translate(-50%, 0) scale(1.04); }
+}
+@keyframes smoke-drift {
+  0%, 100% { transform: translate(-50%, 0) skewX(0deg); opacity: 0.85; }
+  50% { transform: translate(-50%, -2px) skewX(3deg); opacity: 1; }
+}
+
+/* ====== Animal sprites (16×16 pixel, scaled 3×) ======
+   Built with box-shadow pixel painting */
+.animal {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  image-rendering: pixelated;
+}
+.animal .pix {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  top: 0;
+  left: 0;
+}
+
+/* Helper: each animal renders a 16×16 grid via background-image of pixel data URI */
+.animal[data-kind="fox"] {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' shape-rendering='crispEdges'><rect x='3' y='4' width='1' height='1' fill='%23d97a3f'/><rect x='4' y='3' width='1' height='1' fill='%23d97a3f'/><rect x='5' y='4' width='1' height='1' fill='%23e8965a'/><rect x='10' y='4' width='1' height='1' fill='%23e8965a'/><rect x='11' y='3' width='1' height='1' fill='%23d97a3f'/><rect x='12' y='4' width='1' height='1' fill='%23d97a3f'/><rect x='4' y='5' width='8' height='1' fill='%23e8965a'/><rect x='5' y='6' width='6' height='1' fill='%23f4b07a'/><rect x='6' y='6' width='1' height='1' fill='%23151018'/><rect x='9' y='6' width='1' height='1' fill='%23151018'/><rect x='7' y='7' width='2' height='1' fill='%23151018'/><rect x='5' y='7' width='1' height='1' fill='%23f4b07a'/><rect x='10' y='7' width='1' height='1' fill='%23f4b07a'/><rect x='4' y='8' width='8' height='1' fill='%23e8965a'/><rect x='3' y='9' width='10' height='1' fill='%23d97a3f'/><rect x='3' y='10' width='10' height='1' fill='%23d97a3f'/><rect x='2' y='11' width='3' height='1' fill='%23d97a3f'/><rect x='11' y='11' width='3' height='1' fill='%23d97a3f'/><rect x='3' y='12' width='1' height='1' fill='%23a85827'/><rect x='12' y='12' width='1' height='1' fill='%23a85827'/></svg>");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+.animal[data-kind="owl"] {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' shape-rendering='crispEdges'><rect x='5' y='3' width='6' height='1' fill='%23967a5a'/><rect x='4' y='4' width='8' height='1' fill='%23a89070'/><rect x='4' y='5' width='8' height='1' fill='%23b89c80'/><rect x='5' y='5' width='2' height='1' fill='%23f0e6c4'/><rect x='9' y='5' width='2' height='1' fill='%23f0e6c4'/><rect x='5' y='6' width='1' height='1' fill='%23151018'/><rect x='10' y='6' width='1' height='1' fill='%23151018'/><rect x='6' y='6' width='1' height='1' fill='%23f0e6c4'/><rect x='9' y='6' width='1' height='1' fill='%23f0e6c4'/><rect x='7' y='6' width='2' height='1' fill='%23d8a050'/><rect x='4' y='7' width='8' height='1' fill='%23a89070'/><rect x='3' y='8' width='10' height='1' fill='%23967a5a'/><rect x='3' y='9' width='10' height='1' fill='%23a89070'/><rect x='4' y='10' width='8' height='1' fill='%23806244'/><rect x='5' y='10' width='1' height='1' fill='%23a89070'/><rect x='10' y='10' width='1' height='1' fill='%23a89070'/><rect x='5' y='11' width='6' height='1' fill='%23806244'/><rect x='6' y='12' width='1' height='1' fill='%23d8a050'/><rect x='9' y='12' width='1' height='1' fill='%23d8a050'/></svg>");
+  background-size: 100% 100%;
+  image-rendering: pixelated;
+}
+.animal[data-kind="deer"] {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' shape-rendering='crispEdges'><rect x='4' y='2' width='1' height='1' fill='%23806244'/><rect x='3' y='3' width='1' height='1' fill='%23806244'/><rect x='5' y='3' width='1' height='1' fill='%23806244'/><rect x='10' y='2' width='1' height='1' fill='%23806244'/><rect x='9' y='3' width='1' height='1' fill='%23806244'/><rect x='11' y='3' width='1' height='1' fill='%23806244'/><rect x='4' y='4' width='1' height='1' fill='%23806244'/><rect x='10' y='4' width='1' height='1' fill='%23806244'/><rect x='5' y='5' width='6' height='1' fill='%23a87850'/><rect x='4' y='6' width='8' height='1' fill='%23b88a60'/><rect x='5' y='7' width='1' height='1' fill='%23151018'/><rect x='10' y='7' width='1' height='1' fill='%23151018'/><rect x='6' y='7' width='4' height='1' fill='%23b88a60'/><rect x='4' y='8' width='8' height='1' fill='%23a87850'/><rect x='4' y='9' width='8' height='1' fill='%23a87850'/><rect x='3' y='10' width='10' height='1' fill='%23a87850'/><rect x='3' y='11' width='2' height='1' fill='%23a87850'/><rect x='11' y='11' width='2' height='1' fill='%23a87850'/><rect x='3' y='12' width='1' height='1' fill='%23806244'/><rect x='4' y='12' width='1' height='1' fill='%23806244'/><rect x='11' y='12' width='1' height='1' fill='%23806244'/><rect x='12' y='12' width='1' height='1' fill='%23806244'/></svg>");
+  background-size: 100% 100%;
+  image-rendering: pixelated;
+}
+.animal[data-kind="rabbit"] {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' shape-rendering='crispEdges'><rect x='4' y='2' width='1' height='3' fill='%23d8d0c4'/><rect x='5' y='2' width='1' height='2' fill='%23e8e0d4'/><rect x='10' y='2' width='1' height='3' fill='%23d8d0c4'/><rect x='11' y='2' width='1' height='2' fill='%23e8e0d4'/><rect x='5' y='3' width='1' height='2' fill='%23a89890'/><rect x='10' y='3' width='1' height='2' fill='%23a89890'/><rect x='5' y='5' width='6' height='1' fill='%23e8e0d4'/><rect x='4' y='6' width='8' height='1' fill='%23f0eadf'/><rect x='5' y='7' width='1' height='1' fill='%23151018'/><rect x='10' y='7' width='1' height='1' fill='%23151018'/><rect x='7' y='7' width='2' height='1' fill='%23d88090'/><rect x='4' y='8' width='8' height='1' fill='%23e8e0d4'/><rect x='3' y='9' width='10' height='1' fill='%23d8d0c4'/><rect x='4' y='10' width='8' height='1' fill='%23d8d0c4'/><rect x='4' y='11' width='2' height='1' fill='%23a89890'/><rect x='10' y='11' width='2' height='1' fill='%23a89890'/></svg>");
+  background-size: 100% 100%;
+  image-rendering: pixelated;
+}
+.animal[data-kind="bear"] {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' shape-rendering='crispEdges'><rect x='3' y='3' width='2' height='2' fill='%23413228'/><rect x='11' y='3' width='2' height='2' fill='%23413228'/><rect x='4' y='4' width='8' height='1' fill='%23584438'/><rect x='3' y='5' width='10' height='1' fill='%23584438'/><rect x='3' y='6' width='10' height='1' fill='%236e5444'/><rect x='5' y='6' width='1' height='1' fill='%23151018'/><rect x='10' y='6' width='1' height='1' fill='%23151018'/><rect x='3' y='7' width='10' height='1' fill='%236e5444'/><rect x='6' y='7' width='4' height='1' fill='%23a08070'/><rect x='7' y='8' width='2' height='1' fill='%23151018'/><rect x='3' y='8' width='10' height='1' fill='%23584438'/><rect x='3' y='9' width='10' height='1' fill='%23584438'/><rect x='3' y='10' width='10' height='1' fill='%23413228'/><rect x='3' y='11' width='2' height='1' fill='%23584438'/><rect x='11' y='11' width='2' height='1' fill='%23584438'/></svg>");
+  background-size: 100% 100%;
+  image-rendering: pixelated;
+}
+.animal[data-kind="cat"] {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' shape-rendering='crispEdges'><rect x='3' y='3' width='1' height='1' fill='%23404048'/><rect x='4' y='4' width='1' height='1' fill='%23404048'/><rect x='12' y='3' width='1' height='1' fill='%23404048'/><rect x='11' y='4' width='1' height='1' fill='%23404048'/><rect x='4' y='5' width='8' height='1' fill='%235a5c66'/><rect x='3' y='6' width='10' height='1' fill='%236c6f7c'/><rect x='5' y='6' width='1' height='1' fill='%237ce0a0'/><rect x='10' y='6' width='1' height='1' fill='%237ce0a0'/><rect x='3' y='7' width='10' height='1' fill='%236c6f7c'/><rect x='7' y='7' width='2' height='1' fill='%23d88090'/><rect x='3' y='8' width='10' height='1' fill='%235a5c66'/><rect x='3' y='9' width='10' height='1' fill='%235a5c66'/><rect x='3' y='10' width='10' height='1' fill='%23404048'/><rect x='3' y='11' width='2' height='1' fill='%23404048'/><rect x='11' y='11' width='2' height='1' fill='%23404048'/><rect x='13' y='10' width='1' height='1' fill='%23404048'/><rect x='14' y='9' width='1' height='1' fill='%23404048'/></svg>");
+  background-size: 100% 100%;
+  image-rendering: pixelated;
+}
+
+/* ====== Tree / pine silhouettes ====== */
+.pine {
+  position: absolute;
+  bottom: 0;
+  width: 32px;
+  height: 56px;
+  background:
+    linear-gradient(180deg, transparent 0%, transparent 70%, #2a1a0d 70%, #2a1a0d 100%);
+}
+.pine::before {
+  content: "";
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 14px solid transparent;
+  border-right: 14px solid transparent;
+  border-bottom: 40px solid var(--pine-color, #1a3028);
+}
+.pine.t2::before { border-bottom-color: var(--pine-color-2, #14241e); width: 0; height: 0; border-left-width: 12px; border-right-width: 12px; border-bottom-width: 36px; }
+
+/* ====== Mountain silhouettes (parallax bg) ====== */
+.mountain {
+  position: absolute;
+  bottom: 0;
+  width: 0;
+  height: 0;
+}

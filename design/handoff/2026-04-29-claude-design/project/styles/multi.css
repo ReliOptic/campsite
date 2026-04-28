@@ -1,0 +1,96 @@
+/* === Multi-camp tile (F-3) === */
+.mini-camp {
+  background: var(--surface-low);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  cursor: pointer;
+  transition: background 200ms;
+}
+.mini-camp:hover { background: var(--surface-high); }
+.mini-camp .ca-tl-pin, .mini-camp .ca-br-pin {
+  position: absolute; width: 4px; height: 4px; background: var(--tertiary); z-index: 2;
+}
+.mini-camp .ca-tl-pin { top: 0; left: 0; }
+.mini-camp .ca-br-pin { bottom: 0; right: 0; }
+.mini-camp[data-state="yeongi"] {
+  background: linear-gradient(180deg, rgba(75, 224, 255, 0.08), var(--surface-low));
+}
+.mini-camp[data-state="deungbul"]::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--deungbul); z-index: 2;
+}
+.mini-camp[data-state="yeongi"]::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--yeongi-edge); z-index: 2;
+}
+
+.mini-camp .mc-scene {
+  position: relative;
+  height: 60%;
+  background:
+    linear-gradient(180deg, var(--sky-mid) 0%, var(--sky-near) 100%);
+  overflow: hidden;
+}
+.mini-camp .mc-fire {
+  position: absolute;
+  bottom: 14%;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.mini-camp .mc-animal {
+  position: absolute;
+  bottom: 8%;
+  transform: translateX(-50%);
+}
+.mini-camp .mc-pine {
+  position: absolute;
+  bottom: 0;
+}
+.mini-camp .mc-scene::after {
+  content: "";
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 30%;
+  background:
+    repeating-linear-gradient(180deg, var(--ground-1, #1a1820) 0 4px, var(--ground-2, #14121a) 4px 8px);
+}
+[data-theme="canyon"] .mini-camp .mc-scene { background: linear-gradient(180deg, #d2deea 0%, #e3d5be 100%); }
+[data-theme="canyon"] .mini-camp .mc-scene::after {
+  background: repeating-linear-gradient(180deg, #c08566 0 4px, #a86442 4px 8px);
+}
+[data-theme="granite"] .mini-camp .mc-scene { background: linear-gradient(180deg, #182229 0%, #20303a 100%); }
+
+.mini-camp .mc-meta {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  background: var(--surface-low);
+  position: relative;
+  z-index: 1;
+}
+.mini-camp .mc-head { display: flex; align-items: center; gap: 8px; }
+.mini-camp .mc-name {
+  font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: 0.05em; color: var(--on-surface);
+  text-transform: lowercase;
+}
+.mini-camp .mc-state-ko {
+  font-family: var(--font-kr); font-size: 10px;
+  color: var(--on-surface-dim); margin-left: auto;
+}
+.mini-camp .mc-mission {
+  font-family: var(--font-display); font-size: 13px; font-weight: 600;
+  color: var(--on-surface); line-height: 1.3;
+  text-wrap: pretty;
+}
+.mini-camp .mc-mission-ko {
+  font-family: var(--font-kr); font-size: 11px;
+  color: var(--on-surface-dim);
+}
+.mini-camp .mc-stats {
+  display: flex; gap: 12px; margin-top: 4px;
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--on-surface-dim); letter-spacing: 0.04em;
+}

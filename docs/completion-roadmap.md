@@ -160,6 +160,10 @@ Campsite는 다음 정서적·인지적 조건을 만족시킨다.
 
 ### Phase 5 — Visual Identity Production (자산 생산)
 
+**Status**: in_progress (2026-04-29 1차분 도착)
+
+**1차 핸드오프 (2026-04-29)**: Claude Design 도구로 산출된 LoFi prototype 13파일이 `design/handoff/2026-04-29-claude-design/`에 도착. F-1/F-2/F-3 시안 + 디자인 시스템 레퍼런스 + 5종 화로 + 6종 동물 sprite + 환경 테마 3종 응용 팔레트 포함. 토큰 발주서 §5.1과 100% 일치. 통합 계획은 `design/handoff/2026-04-29-claude-design/INTEGRATION.md`.
+
 **Goal**: 캠프 표면이 시각 정체성을 갖는다. 픽셀 아트 자산이 실제로 적재되어 SVG 폴백을 대체한다.
 
 **Inputs**:

@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Campsite — Camp View</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Pretendard:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles/tokens.css" />
+  <link rel="stylesheet" href="styles/pixel-art.css" />
+  <link rel="stylesheet" href="styles/scene.css" />
+  <link rel="stylesheet" href="styles/multi.css" />
+  <style>
+    body { overflow-x: hidden; }
+    /* Section header strips on the canvas */
+    .system-note {
+      font-family: "Inter", sans-serif;
+      font-size: 13px;
+      color: #888;
+      line-height: 1.6;
+      max-width: 720px;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script type="text/babel" src="design-canvas.jsx"></script>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <script type="text/babel" src="scripts/active-camp.jsx"></script>
+  <script type="text/babel" src="scripts/other-screens.jsx"></script>
+
+  <script type="text/babel" data-presets="react">
+    /* global React, ReactDOM, DesignCanvas, DCSection, DCArtboard,
+              TweaksPanel, useTweaks, TweakSection, TweakRadio, TweakSlider, TweakToggle, TweakSelect,
+              ActiveCampScreen, EmptyCampScreen, MultiProjectScreen, PARTICIPANTS, STATE_META */
+    const { useState } = React;
+
+    const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+      "theme": "canyon",
+      "auroraIntensity": 0.55,
+      "starDensity": 0.85,
+      "density": "normal",
+      "fireOverride": "auto",
+      "lofi": true,
+      "primaryAnimal": "fox"
+    }/*EDITMODE-END*/;
+
+    function App() {
+      const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+      const [drawerP, setDrawerP] = useState(null);
+
+      return (
+        <>
+          <DesignCanvas title="Campsite — Camp View" subtitle="Recovery-first AI workspace · Nocturnal Interface" initialZoom={0.55}>
+            <DCSection id="active" title="F-2 · Active Camp" subtitle="payments-v1 · 4 participants · 1 blocked · 1 to review">
+              <DCArtboard id="active-camp" label="Active Camp · 1440×900" width={1440} height={950}>
+                <ActiveCampScreen tweaks={tweaks} drawerP={drawerP} setDrawerP={setDrawerP} />
+              </DCArtboard>
+            </DCSection>
+
+            <DCSection id="empty" title="F-1 · Empty Camp" subtitle="First entry · no mission · invite to light the fire">
+              <DCArtboard id="empty-camp" label="Empty Camp · 1440×900" width={1440} height={950}>
+                <EmptyCampScreen tweaks={tweaks} />
+              </DCArtboard>
+            </DCSection>
+
+            <DCSection id="multi" title="F-3 · Multi-Project Hub" subtitle="6 camps in one valley · each camp has its own fire-state">
+              <DCArtboard id="multi-hub" label="Multi-Project Hub · 1440×900" width={1440} height={950}>
+                <MultiProjectScreen tweaks={tweaks} />
+              </DCArtboard>
+            </DCSection>
+
+            <DCSection id="legend" title="Design system · 화로 5종 + 환경 테마" subtitle="Fire-state legend across all 3 environment themes">
+              <DCArtboard id="fire-states" label="Fire-state legend" width={1200} height={420}>
+                <FireStateLegend />
+              </DCArtboard>
+              <DCArtboard id="theme-trio" label="Environment themes — Aurora / Canyon / Granite" width={1200} height={520}>
+                <ThemeTrio />
+              </DCArtboard>
+              <DCArtboard id="animals" label="Participant animals · 6종 마이크로 스프라이트" width={1200} height={300}>
+                <AnimalLineup />
+              </DCArtboard>
+            </DCSection>
+          </DesignCanvas>
+
+          <TweaksPanel title="Tweaks">
+            <TweakSection title="Environment theme">
+              <TweakRadio
+                value={tweaks.theme}
+                onChange={(v) => setTweak("theme", v)}
+                options={[
+                  { value: "aurora", label: "Aurora Dark" },
+                  { value: "canyon", label: "Canyon Day" },
+                  { value: "granite", label: "Granite Pine" }
+                ]}
+              />
+            </TweakSection>
+            <TweakSection title="Atmosphere">
+              <TweakSlider label="Aurora intensity" min={0} max={1} step={0.05} value={tweaks.auroraIntensity} onChange={(v) => setTweak("auroraIntensity", v)} />
+              <TweakSlider label="Star density" min={0} max={1} step={0.05} value={tweaks.starDensity} onChange={(v) => setTweak("starDensity", v)} />
+              <TweakToggle label="Lofi motion" value={tweaks.lofi} onChange={(v) => setTweak("lofi", v)} />
+            </TweakSection>
+            <TweakSection title="Camp density">
+              <TweakRadio
+                value={tweaks.density}
+                onChange={(v) => setTweak("density", v)}
+                options={[
+                  { value: "sparse", label: "Sparse · 2" },
+                  { value: "normal", label: "Normal · 4" },
+                  { value: "dense", label: "Dense · 8" }
+                ]}
+              />
+            </TweakSection>
+            <TweakSection title="Fire-state simulation" subtitle="Force every participant to one state for blind-test verification">
+              <TweakSelect
+                value={tweaks.fireOverride}
+                onChange={(v) => setTweak("fireOverride", v)}
+                options={[
+                  { value: "auto", label: "Auto (per participant)" },
+                  { value: "bulssi", label: "불씨 · bulssi" },
+                  { value: "modakbul", label: "모닥불 · modakbul" },
+                  { value: "deungbul", label: "등불 · deungbul" },
+                  { value: "yeongi", label: "연기 · yeongi" },
+                  { value: "jangjak", label: "장작 · jangjak" }
+                ]}
+              />
+            </TweakSection>
+          </TweaksPanel>
+        </>
+      );
+    }
+
+    // ========================================================
+    // Design system reference cards
+    // ========================================================
+    function FireStateLegend() {
+      const states = ["bulssi","modakbul","deungbul","yeongi","jangjak"];
+      const desc = {
+        bulssi:   { en: "Just started, weak trust",       ko: "막 시작됨, 약한 신뢰" },
+        modakbul: { en: "Active, in progress",            ko: "활발하게 진행 중" },
+        deungbul: { en: "Ready for review",               ko: "검토 대기" },
+        yeongi:   { en: "Blocked, needs help",            ko: "차단됨, 도움 필요" },
+        jangjak:  { en: "Next move prepared",             ko: "다음 행동 준비" },
+      };
+      return (
+        <div data-theme="aurora" style={{ width: 1200, height: 420, background: "var(--surface)", padding: 32, display: "flex", flexDirection: "column", gap: 24 }}>
+          <div>
+            <div className="t-label" style={{ marginBottom: 6 }}>Fire-state semantics · 화로 상태 5종</div>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 600 }}>Visual hierarchy of trust</div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16, flex: 1 }}>
+            {states.map(s => (
+              <div key={s} style={{ background: "var(--surface-low)", padding: 20, position: "relative", display: "flex", flexDirection: "column", gap: 12 }}>
+                <span style={{position:"absolute",top:0,left:0,width:4,height:4,background:"var(--tertiary)"}} />
+                <span style={{position:"absolute",bottom:0,right:0,width:4,height:4,background:"var(--tertiary)"}} />
+                <div style={{ display: "flex", justifyContent: "center", padding: "12px 0" }}>
+                  <FireMini state={s} />
+                </div>
+                <div>
+                  <div style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 600 }}>{s}</div>
+                  <div style={{ fontFamily: "var(--font-kr)", fontSize: 13, color: "var(--on-surface-dim)" }}>{STATE_META[s].ko}</div>
+                </div>
+                <div style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--on-surface-dim)", lineHeight: 1.5 }}>
+                  {desc[s].en}
+                  <div style={{ fontFamily: "var(--font-kr)", color: "var(--on-surface-faint)", fontSize: 11, marginTop: 4 }}>{desc[s].ko}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function FireMini({ state }) {
+      return <div className="fire-mini" data-state={state}><div className="core" /></div>;
+    }
+
+    function ThemeTrio() {
+      const themes = [
+        { id: "aurora", name: "Aurora Dark", ko: "오로라 다크", desc: "Northern night camp · cyan-green ribbons" },
+        { id: "canyon", name: "Canyon Daylight", ko: "캐년 데이라이트", desc: "Sun-warmed sandstone · pale sky blue" },
+        { id: "granite", name: "Granite & Pine", ko: "그라나이트 포레스트", desc: "Muted stone, deep evergreen" },
+      ];
+      return (
+        <div style={{ width: 1200, height: 520, background: "#0a0a0d", padding: 24, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+          {themes.map(t => (
+            <div key={t.id} data-theme={t.id} style={{ background: "var(--surface)", display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
+              <span style={{position:"absolute",top:0,left:0,width:4,height:4,background:"var(--tertiary)",zIndex:5}} />
+              <span style={{position:"absolute",bottom:0,right:0,width:4,height:4,background:"var(--tertiary)",zIndex:5}} />
+              <div style={{ position: "relative", height: 280, overflow: "hidden", background: "var(--sky-deep)" }}>
+                <div className="sky" />
+                <div className="stars">
+                  {Array.from({length: 30}).map((_, i) => (
+                    <span key={i} className="star tw" style={{top: `${Math.random()*60}%`, left: `${Math.random()*100}%`, animationDelay: `${i*0.2}s`}} />
+                  ))}
+                </div>
+                <div className="moon" style={{ width: 36, height: 36, top: "15%", right: "12%" }} />
+                <div className="aurora" style={{"--aurora-opacity": 0.55}}>
+                  <div className="ribbon r1" />
+                  <div className="ribbon r2" />
+                </div>
+                <div className="mountains" style={{ height: 100, bottom: "30%" }}>
+                  <div className="layer far" />
+                  <div className="layer mid" />
+                </div>
+                <div className="forest" style={{ bottom: "30%" }}>
+                  {Array.from({length: 8}).map((_, i) => <div key={i} className={`pine ${i%2 ? "t2": ""}`} style={{ left: `${i*13}%`, transform: `scale(${0.5 + (i%2)*0.2})`}}/>)}
+                </div>
+                <div className="ground" />
+                <div style={{ position: "absolute", bottom: "16%", left: "50%", transform: "translateX(-50%) scale(0.7)" }}>
+                  <Campfire />
+                </div>
+              </div>
+              <div style={{ padding: 16, background: "var(--surface)" }}>
+                <div style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 600, color: "var(--on-surface)" }}>{t.name}</div>
+                <div style={{ fontFamily: "var(--font-kr)", fontSize: 12, color: "var(--on-surface-dim)" }}>{t.ko}</div>
+                <div style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--on-surface-dim)", marginTop: 8, lineHeight: 1.5 }}>{t.desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    function Campfire() {
+      return (
+        <div className="campfire">
+          <div className="logs"><div className="log-stripe" /></div>
+          <div className="embers" />
+          <div className="flame" />
+          <div className="spark s1" />
+          <div className="spark s2" />
+          <div className="spark s3" />
+        </div>
+      );
+    }
+
+    function AnimalLineup() {
+      const animals = [
+        { kind: "fox",    name: "Fox · 여우",     role: "modakbul · 활동 중인 코더" },
+        { kind: "owl",    name: "Owl · 올빼미",   role: "deungbul · 검토자" },
+        { kind: "deer",   name: "Deer · 사슴",    role: "deungbul · 신중한 사람" },
+        { kind: "rabbit", name: "Rabbit · 토끼",  role: "bulssi · 막 시작한 사람" },
+        { kind: "bear",   name: "Bear · 곰",      role: "yeongi · 끝까지 가는 사람" },
+        { kind: "cat",    name: "Cat · 고양이",   role: "you · 사용자" },
+      ];
+      return (
+        <div data-theme="aurora" style={{ width: 1200, height: 300, background: "var(--surface)", padding: 32, display: "flex", flexDirection: "column", gap: 16 }}>
+          <div>
+            <div className="t-label" style={{ marginBottom: 6 }}>Participants · 참여자 마이크로 스프라이트</div>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 600 }}>6 animals · 16×16 px source · scaled to context</div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 16, flex: 1 }}>
+            {animals.map(a => (
+              <div key={a.kind} style={{ background: "var(--surface-low)", padding: 16, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, position: "relative" }}>
+                <span style={{position:"absolute",top:0,left:0,width:4,height:4,background:"var(--tertiary)"}} />
+                <span style={{position:"absolute",bottom:0,right:0,width:4,height:4,background:"var(--tertiary)"}} />
+                <div className="animal" data-kind={a.kind} style={{ width: 64, height: 64 }} />
+                <div style={{ fontFamily: "var(--font-display)", fontSize: 13, fontWeight: 600 }}>{a.name}</div>
+                <div style={{ fontFamily: "var(--font-kr)", fontSize: 11, color: "var(--on-surface-dim)", textAlign: "center" }}>{a.role}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

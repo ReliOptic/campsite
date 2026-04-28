@@ -2,16 +2,17 @@
 
 ## Next Action
 
-- task: Phase 5 시각 자산 생산 1차 — 화로 코어 + 5종 화로 상태 아이콘
-- priority: medium
-- estimated-scope: medium
-- entry-point: design/image_prompt.md, design/export/
-- precondition: make check 223/223 통과 (master, origin 동기화 완료)
+- task: 핸드오프 디자인 시스템 → camp_render 통합 Step 1 — 토큰 권위화
+- priority: high
+- estimated-scope: small
+- entry-point: design/handoff/2026-04-29-claude-design/INTEGRATION.md §5.2 Step 1
+- precondition: make check 223/223 통과, 핸드오프 패키지 보관 완료, standalone preview HTTP 200 검증
 - roadmap: docs/completion-roadmap.md (v0.2.0 → v1.0 단계별 계획)
+- preview: bash design/handoff/2026-04-29-claude-design/start-preview.sh (브라우저로 시안 즉시 검토)
 
 ## Context for Next Session
 
-Phase 4 완료 + 기능 점검 완료. `campsite camp message` (send/reply/list/flag/resolve), participants role/stance 컬럼, camp overview unresolved 에스컬레이션, HTML Threads 패널. participant list IFS 탭 붕괴 버그 → awk NR>1 교체, participant remove camp_log_event undefined → camp_event_append 교체, ${2:-} positional arg 버그 수정. make check 223/223 통과, origin 동기화 완료. 다음 작업: design/export/ pixel art 에셋 생성.
+Phase 4 완료 + 기능 점검 완료 + 디자인 발주서 + Active Camp 카피 + completion-roadmap 작성 완료. Claude Design 핸드오프 1차분(13파일: HTML/4 CSS/5 JSX) 도착, `design/handoff/2026-04-29-claude-design/`에 영구 보관. 핸드오프 토큰이 발주서 §5.1과 정확히 일치(Primary `#cdc1e0` / Tertiary `#00dce5` / 화로 5종 색채 100%). standalone preview launcher 동작 검증 완료(HTTP 200 ×3). INTEGRATION.md에 6단계 통합 계획 명시. 다음 작업: Step 1 토큰 권위화(`design/system/tokens.css` 분리).
 
 ## Open Questions
 
@@ -41,3 +42,5 @@ Phase 4 완료 + 기능 점검 완료. `campsite camp message` (send/reply/list/
 | 2026-04-28 | claude-sonnet | HTML camp dashboard Threads panel: amber highlight for unresolved, threaded reply indentation, resolve command hint in footer | Dashboard shows message state alongside participant state |
 | 2026-04-28 | claude-sonnet | 7 integration tests for campsite camp message (send/reply/list/list-unresolved/resolve/flag/overview) | make check 217/217 green |
 | 2026-04-28 | claude-sonnet | 기능 점검: participant list IFS 탭 붕괴 → awk 교체, remove camp_log_event undefined → camp_event_append, ${2:-} positional arg 수정 | make check 223/223, origin push 완료 |
+| 2026-04-29 | claude-sonnet | 디자인 발주서·Active Camp 카피·v1.0 completion roadmap 3종 작성 | design-brief.md 599L · copy-active-camp.md 291L · completion-roadmap.md 522L commit/push 완료 |
+| 2026-04-29 | claude-sonnet | Claude Design 핸드오프 1차분 영구 보관 + standalone preview 검증 + INTEGRATION 6단계 통합 계획 작성 | 13 files in design/handoff/2026-04-29-claude-design/, HTTP 200 ×3 검증, 토큰 발주서 §5.1과 100% 일치 |
