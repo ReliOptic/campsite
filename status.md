@@ -3,14 +3,14 @@
 ## Current State
 
 - phase: building
-- confidence: medium
-- last-updated: 2026-04-27
+- confidence: high
+- last-updated: 2026-04-28
 - last-agent: claude-sonnet
 - last-device: Kiwonui-MacBookAir
 
 ## Active Branch
 
-- branch: main
+- branch: master
 - base: none
 
 ## What Works
@@ -48,14 +48,18 @@
 - CI now runs `make test-hybrid`.
 - Freshness now drives launcher confidence and blocking semantics (`bin/campsite:107-118`, `1649-1663`).
 - Serve-mode environmental scene (forest edges, ground tiles, props) is implemented (`lib/camp.sh:590-666`).
+- 14 HIGH/MEDIUM UX issues fixed: sync completion message, fail() recovery hints, empty state messages, next-move double prefix, participant list/remove, Session Log truncation, templates cleanup.
+- "1 participants" singular/plural bug fixed.
+- make check passes: 172 unit + 38 integration tests (210 total) on local and CI.
+- Phase 4: `campsite camp message` (send/reply/list/flag/resolve), role/stance on participants, unresolved thread escalation in overview and dashboard.
+- HTML camp dashboard now shows Threads panel with amber highlight for unresolved, reply indentation, and resolve command hint.
 
 ## What Does Not Work Yet
 
 - No generated pixel art assets — `design/export/` is empty, Phaser storyworld is inactive.
 - Participant `last_seen` displays raw ISO 8601 timestamps (relative time conversion not implemented).
-- "1 participants in camp" — singular/plural grammar bug.
+- `campsite camp message` has no integration tests yet.
 
 ## Blockers
 
-- `bats` is not available in the current environment, so unit/integration tests run only in CI.
 - Need a clear product decision on whether future checkpoint push should include new untracked files or stay tracked-only.

@@ -2,16 +2,16 @@
 
 ## Next Action
 
-- task: 디자인 에셋 생성 — design/image_prompt.md 프롬프트로 첫 6종 pixel art 생성 후 design/export/에 배치
-- fallback-task: interactive launcher/setup TTY 검증, freshness → launcher confidence 반영
-- priority: medium
-- estimated-scope: medium
-- entry-point: design/image_prompt.md (프롬프트), design/export/ (결과물), lib/camp-assets.sh (파이프라인)
-- precondition: CSS/SVG fallback layer 완성, asset pipeline code 준비됨
+- task: campsite camp message 통합 테스트 추가 — tests/integration/test_camp.bats에 send/reply/list/flag/resolve 커버리지
+- fallback-task: 디자인 에셋 생성 — design/image_prompt.md 프롬프트로 첫 6종 pixel art 생성 후 design/export/에 배치
+- priority: high
+- estimated-scope: small
+- entry-point: tests/integration/test_camp.bats, lib/camp.sh (camp_message_* 함수들)
+- precondition: make check 210/210 통과 (master, ahead 4 of remote)
 
 ## Context for Next Session
 
-디자인 에셋 Phase 1-3 완료: CSS night sky + stars, inline SVG sprites (campfire + 5 fire-state icons), campfire glow/flicker, corner accents, modakbul pulse, prefers-reduced-motion. Asset pipeline (lib/camp-assets.sh) 구축: install/base64/manifest. Serve JSON에 participant 배열 추가, live-poll에서 participant 목록 실시간 갱신. 다음은 실제 pixel art 이미지 생성 (campfire-core, status badges 우선) 또는 interactive launcher 검증.
+Phase 4 완료: `campsite camp message` (send/reply/list/flag/resolve), participants에 role/stance 컬럼 추가, camp overview에 unresolved 에스컬레이션, HTML 대시보드에 Threads 패널(amber 강조, 답글 들여쓰기, resolve 힌트). 14건 UX 개선(sync 완료 메시지, fail() 힌트, 빈 상태 문구, next-move 이중 접두어 제거 등) 및 8건 통합 테스트 버그 수정 완료. make check 210/210 로컬 통과. 4개 커밋 remote push 전 상태.
 
 ## Open Questions
 
@@ -35,3 +35,7 @@
 | 2026-04-03 | claude-opus | Fixed validate set-e/regex bug, install.sh bash 4+ false requirement, go history bootstrap + macOS tac compat, added font CDN, browser failure message, adapter zero UX, CI hybrid smoke | All non-interactive commands verified end-to-end on fresh install |
 | 2026-04-03 | claude-opus | Replaced dashboard camp render with return-first minimal view, fixed bash read empty-field bug via awk, added camp serve live-poll selector update | Camp render is now a functional return-first view |
 | 2026-04-04 | claude-opus | Built design asset layers: CSS night sky + stars, SVG sprite sheet (6 icons), campfire glow, corner accents, animations, asset pipeline (lib/camp-assets.sh), serve JSON with participants, live-poll participant refresh | Camp render has visual identity matching product vision |
+| 2026-04-28 | claude-sonnet | Fixed 8 integration test failures (phaser path, IFS tab collapse, PID mismatch, lock dir vs file, empty state assertions) and 2 core bugs (camp_session_finish IFS, participant update IFS) | make check 210/210 green on local |
+| 2026-04-28 | claude-sonnet | Applied 14 HIGH/MEDIUM UX improvements: sync completion message, fail() recovery hints, empty state text, next-move double prefix, participant list/remove, Session Log truncation, template cleanup | CLI UX quality review items resolved |
+| 2026-04-28 | claude-sonnet | Phase 4: campsite camp message (send/reply/list/flag/resolve), role/stance on participants (TSV cols 12-13), unresolved escalation in overview and dashboard | Inter-agent async messaging channel live |
+| 2026-04-28 | claude-sonnet | HTML camp dashboard Threads panel: amber highlight for unresolved, threaded reply indentation, resolve command hint in footer | Dashboard shows message state alongside participant state |

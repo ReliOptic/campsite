@@ -1,7 +1,7 @@
 # Campsite Implementation Tracker
 
 > Status: In Progress
-> Last updated: 2026-04-03
+> Last updated: 2026-04-28
 > Goal: execute the recommended PRD-aligned implementation in handoff-safe slices
 
 ## Working Rules
@@ -129,8 +129,38 @@ Completed work:
 - improved zero-adapter message in `sync` with specific install guidance
 - added `make test-hybrid` step to CI workflow
 
+### Step 7. Test Stability and UX Quality
+
+Status: `completed`
+
+Completed work:
+
+- fixed 8 integration test failures: phaser renderer path mismatch (CAMPSITE_DISABLE_PHASER), IFS tab collapse with \037 separator, PID variable expansion in bats, lock directory vs file assertions, empty state string assertions
+- fixed 2 core bugs: camp_session_finish and participant update IFS read dropping empty blocker field
+- applied 14 HIGH/MEDIUM UX improvements from quality review: sync completion message, fail() recovery hints on all _validate_project calls, detect_project failure hint, empty state messages, next-move double prefix removed, participant list/remove subcommands, Session Log truncation, Fallback Action section removed from template, status.md CLI field boundary comment
+- make check: 172 unit + 38 integration = 210 tests, all passing locally
+
+### Step 8. Phase 4 — Inter-Agent Messaging
+
+Status: `completed`
+
+Completed work:
+
+- `campsite camp message send/reply/list/flag/resolve` subcommand
+- `participants.tsv` extended with `role` (col 12) and `stance` (col 13) fields
+- `participant enter/update` accept `--role=` and `--stance=` flags
+- `camp_overview_lines()` emits MSGS line when unresolved count > 0
+- `camp overview` and terminal status show escalation line
+- HTML camp dashboard Threads panel: amber left border for unresolved, reply indentation, resolve command hint, footer unresolved count
+- dashboard JSON includes `unresolved_count`, `role`, `stance` per participant
+- storage: `.campsite/camp/messages.tsv` (msg_id/timestamp/from_id/to_id/body/thread_id/flags)
+
+Remaining:
+
+- integration tests for `campsite camp message` not yet written
+
 ## Current Next Move
 
-- interactive launcher와 setup 흐름 점검 (TTY 환경 필요)
-- freshness를 launcher confidence에 반영하는 단계 검토
-- camp render HTML return panel과 terminal output label 일관성 최종 점검
+- add integration tests for `campsite camp message` (send/reply/list/flag/resolve) in tests/integration/test_camp.bats
+- consider pixel art asset generation (design/image_prompt.md → design/export/)
+- remote push: master is ahead 4 commits of origin/master
