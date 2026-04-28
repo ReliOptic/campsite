@@ -30,6 +30,11 @@ camp_events_path() {
     printf '%s/events.tsv' "$(camp_dir "$project_root")"
 }
 
+camp_messages_path() {
+    local project_root="$1"
+    printf '%s/messages.tsv' "$(camp_dir "$project_root")"
+}
+
 camp_sessions_dir() {
     local project_root="$1"
     local dir
@@ -109,11 +114,17 @@ EOF
     fi
 
     if [[ ! -f "$participants_file" ]]; then
-        printf 'id\tname\ttype\ttool\tterminal\tfire_state\tsummary\tblocker\tnext_action\tlast_updated\tpriority\n' > "$participants_file"
+        printf 'id\tname\ttype\ttool\tterminal\tfire_state\tsummary\tblocker\tnext_action\tlast_updated\tpriority\trole\tstance\n' > "$participants_file"
     fi
 
     if [[ ! -f "$events_file" ]]; then
         printf 'created_at\tparticipant_id\tfrom_state\tto_state\tsummary\n' > "$events_file"
+    fi
+
+    local messages_file
+    messages_file="$(camp_messages_path "$project_root")"
+    if [[ ! -f "$messages_file" ]]; then
+        printf 'msg_id\ttimestamp\tfrom_id\tto_id\tbody\tthread_id\tflags\n' > "$messages_file"
     fi
 }
 
@@ -173,7 +184,7 @@ camp_participant_get() {
 }
 
 camp_participant_upsert() {
-    local project_root="$1" participant_id="$2" name="$3" ptype="$4" tool="$5" terminal="$6" fire_state="$7" summary="$8" blocker="$9" next_action="${10}" priority="${11:-50}"
+    local project_root="$1" participant_id="$2" name="$3" ptype="$4" tool="$5" terminal="$6" fire_state="$7" summary="$8" blocker="$9" next_action="${10}" priority="${11:-50}" role="${12:-}" stance="${13:-}"
     camp_ensure_store "$project_root"
     camp_validate_state "$fire_state"
 
@@ -188,10 +199,12 @@ camp_participant_upsert() {
     summary="$(printf '%s' "$summary" | camp_clean_text)"
     blocker="$(printf '%s' "$blocker" | camp_clean_text)"
     next_action="$(printf '%s' "$next_action" | camp_clean_text)"
+    role="$(printf '%s' "$role" | camp_clean_text)"
+    stance="$(printf '%s' "$stance" | camp_clean_text)"
 
     awk -F'\t' -v id="$participant_id" 'NR == 1 || $1 != id { print }' "$participants_file" > "$tmpfile"
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-        "$participant_id" "$name" "$ptype" "$tool" "$terminal" "$fire_state" "$summary" "$blocker" "$next_action" "$(now_iso)" "$priority" \
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+        "$participant_id" "$name" "$ptype" "$tool" "$terminal" "$fire_state" "$summary" "$blocker" "$next_action" "$(now_iso)" "$priority" "$role" "$stance" \
         >> "$tmpfile"
     mv "$tmpfile" "$participants_file"
 }
@@ -206,6 +219,57 @@ camp_event_append() {
         "$(printf '%s' "$to_state" | camp_clean_text)" \
         "$(printf '%s' "$summary" | camp_clean_text)" \
         >> "$(camp_events_path "$project_root")"
+}
+
+camp_message_send() {
+    local project_root="$1" from_id="$2" to_id="${3:-all}" body="$4"
+    camp_ensure_store "$project_root"
+    local msg_id
+    msg_id="msg-$(date +%s)$$"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+        "$msg_id" "$(now_iso)" \
+        "$(printf '%s' "$from_id" | camp_clean_text)" \
+        "$(printf '%s' "$to_id"   | camp_clean_text)" \
+        "$(printf '%s' "$body"    | camp_clean_text)" \
+        "" "unresolved" \
+        >> "$(camp_messages_path "$project_root")"
+    printf '%s' "$msg_id"
+}
+
+camp_message_reply() {
+    local project_root="$1" thread_id="$2" from_id="$3" body="$4"
+    camp_ensure_store "$project_root"
+    local messages_file msg_id orig_from to_id
+    messages_file="$(camp_messages_path "$project_root")"
+    orig_from="$(awk -F'\t' -v tid="$thread_id" 'NR>1 && $1==tid {print $3; exit}' "$messages_file")"
+    to_id="${orig_from:-all}"
+    msg_id="msg-$(date +%s)$$"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+        "$msg_id" "$(now_iso)" \
+        "$(printf '%s' "$from_id"  | camp_clean_text)" \
+        "$(printf '%s' "$to_id"    | camp_clean_text)" \
+        "$(printf '%s' "$body"     | camp_clean_text)" \
+        "$(printf '%s' "$thread_id"| camp_clean_text)" "" \
+        >> "$messages_file"
+    printf '%s' "$msg_id"
+}
+
+camp_message_set_flag() {
+    local project_root="$1" msg_id="$2" flag="$3"
+    local messages_file tmpfile
+    messages_file="$(camp_messages_path "$project_root")"
+    tmpfile="${messages_file}.tmp"
+    awk -F'\t' -v OFS='\t' -v mid="$msg_id" -v fl="$flag" \
+        'NR==1{print;next} $1==mid{$7=fl;print;next} {print}' \
+        "$messages_file" > "$tmpfile" && mv "$tmpfile" "$messages_file"
+}
+
+camp_messages_unresolved_count() {
+    local project_root="$1"
+    local messages_file
+    messages_file="$(camp_messages_path "$project_root")"
+    [[ -f "$messages_file" ]] || { printf '0'; return 0; }
+    awk -F'\t' 'NR>1 && $7=="unresolved" {count++} END {print count+0}' "$messages_file"
 }
 
 camp_session_start() {
@@ -255,7 +319,7 @@ camp_session_finish() {
     [[ -n "$existing" ]] || return 0
 
     local _ep; _ep="$(printf '%s' "$existing" | tr '\t' '\037')"
-    IFS=$'\037' read -r _id name ptype stored_tool terminal old_state summary blocker next_action _last_updated priority <<< "$_ep"
+    IFS=$'\037' read -r _id name ptype stored_tool terminal old_state summary blocker next_action _last_updated priority role stance <<< "$_ep"
 
     local new_state new_summary
     next_action="$(field_value "$project_root/handoff.md" "task" 2>/dev/null || echo "$next_action")"
@@ -294,7 +358,7 @@ camp_session_finish() {
         blocker=""
     fi
 
-    camp_participant_upsert "$project_root" "$participant_id" "$name" "$ptype" "$stored_tool" "$terminal" "$new_state" "$new_summary" "$blocker" "$next_action" "$priority"
+    camp_participant_upsert "$project_root" "$participant_id" "$name" "$ptype" "$stored_tool" "$terminal" "$new_state" "$new_summary" "$blocker" "$next_action" "$priority" "$role" "$stance"
     camp_event_append "$project_root" "$participant_id" "$old_state" "$new_state" "$new_summary"
 
     # Signal collection
@@ -369,6 +433,12 @@ camp_overview_lines() {
             else print "NEXT\t" next_name ": " next_action
         }
     ' "$participants_file"
+
+    local unresolved
+    unresolved="$(camp_messages_unresolved_count "$project_root")"
+    if [[ "$unresolved" -gt 0 ]]; then
+        printf 'MSGS\t%s unresolved — human judgment needed\n' "$unresolved"
+    fi
 }
 
 camp_overview_print() {
@@ -383,9 +453,10 @@ camp_overview_print() {
     printf "  mission: %s\n" "$mission_title"
     while IFS=$'\t' read -r label value; do
         case "$label" in
-            ACTIVE) printf "  working-now: %s\n" "$value" ;;
+            ACTIVE)  printf "  working-now: %s\n" "$value" ;;
             WAITING) printf "  waiting-on-you: %s\n" "$value" ;;
-            NEXT) printf "  next-move: %s\n" "$value" ;;
+            NEXT)    printf "  next-move: %s\n" "$value" ;;
+            MSGS)    printf "  messages: %s\n" "$value" ;;
         esac
     done < <(camp_overview_lines "$project_root")
     printf '\n'

@@ -690,13 +690,14 @@ cmd_dashboard() {
 
 _camp_write_json() {
     local project_root="$1" output="$2"
-    local working_now="" waiting_on_you="" next_move="" participant_count
+    local working_now="" waiting_on_you="" next_move="" unresolved_count="0" participant_count
     participant_count="$(camp_participant_count "$project_root")"
     while IFS=$'\t' read -r label value; do
         case "$label" in
-            ACTIVE) working_now="$value" ;;
+            ACTIVE)  working_now="$value" ;;
             WAITING) waiting_on_you="$value" ;;
-            NEXT) next_move="$value" ;;
+            NEXT)    next_move="$value" ;;
+            MSGS)    unresolved_count="${value%% *}" ;;
         esac
     done < <(camp_overview_lines "$project_root")
     local mission
@@ -710,8 +711,8 @@ _camp_write_json() {
             NR == 1 { next }
             {
                 if (NR > 2) printf ","
-                printf "{\"name\":\"%s\",\"state\":\"%s\",\"summary\":\"%s\",\"blocker\":\"%s\",\"next\":\"%s\",\"tool\":\"%s\",\"terminal\":\"%s\"}",
-                    esc($2), esc($6), esc($7), esc($8), esc($9), esc($4), esc($5)
+                printf "{\"name\":\"%s\",\"state\":\"%s\",\"summary\":\"%s\",\"blocker\":\"%s\",\"next\":\"%s\",\"tool\":\"%s\",\"terminal\":\"%s\",\"role\":\"%s\",\"stance\":\"%s\"}",
+                    esc($2), esc($6), esc($7), esc($8), esc($9), esc($4), esc($5), esc($12), esc($13)
             }
         ' "$participants_file")"
     fi
@@ -722,6 +723,7 @@ _camp_write_json() {
   "waiting_on_you": "$(printf '%s' "$waiting_on_you" | sed 's/"/\\"/g')",
   "next_move": "$(printf '%s' "$next_move" | sed 's/"/\\"/g')",
   "participant_count": "$participant_count",
+  "unresolved_count": "$unresolved_count",
   "participants": [${pjson}],
   "updated_at": "$(now_iso)"
 }
@@ -950,7 +952,7 @@ cmd_camp() {
                     shift || true
                     [[ -n "$participant_id" ]] || fail "participant id required" "usage: campsite camp participant enter <id> [--name=...] [--type=...] [--tool=...] [--terminal=...] [--state=...] [--summary=...] [--next-action=...] [--priority=N]"
 
-                    local name="$participant_id" ptype="agent" tool="" terminal="" fire_state="bulssi" summary="" next_action="" priority="50"
+                    local name="$participant_id" ptype="agent" tool="" terminal="" fire_state="bulssi" summary="" next_action="" priority="50" role="" stance=""
                     for arg in "$@"; do
                         case "$arg" in
                             --name=*) name="${arg#--name=}" ;;
@@ -961,11 +963,13 @@ cmd_camp() {
                             --summary=*) summary="${arg#--summary=}" ;;
                             --next-action=*) next_action="${arg#--next-action=}" ;;
                             --priority=*) priority="${arg#--priority=}" ;;
+                            --role=*) role="${arg#--role=}" ;;
+                            --stance=*) stance="${arg#--stance=}" ;;
                             *) fail "unknown flag for campsite camp participant enter: $arg" ;;
                         esac
                     done
 
-                    camp_participant_upsert "$project" "$participant_id" "$name" "$ptype" "$tool" "$terminal" "$fire_state" "$summary" "" "$next_action" "$priority"
+                    camp_participant_upsert "$project" "$participant_id" "$name" "$ptype" "$tool" "$terminal" "$fire_state" "$summary" "" "$next_action" "$priority" "$role" "$stance"
                     camp_event_append "$project" "$participant_id" "" "$fire_state" "${summary:-Entered the camp.}"
                     info "camp participant entered → $participant_id"
                     ;;
@@ -979,7 +983,7 @@ cmd_camp() {
                     [[ -n "$existing" ]] || fail "unknown participant: $participant_id" "Run 'campsite camp participant enter $participant_id ...' first."
 
                     local _ep; _ep="$(printf '%s' "$existing" | tr '\t' '\037')"
-                    IFS=$'\037' read -r _id name ptype tool terminal fire_state summary blocker next_action _last_updated priority <<< "$_ep"
+                    IFS=$'\037' read -r _id name ptype tool terminal fire_state summary blocker next_action _last_updated priority role stance <<< "$_ep"
                     local old_state="$fire_state"
 
                     for arg in "$@"; do
@@ -993,11 +997,13 @@ cmd_camp() {
                             --blocker=*) blocker="${arg#--blocker=}" ;;
                             --next-action=*) next_action="${arg#--next-action=}" ;;
                             --priority=*) priority="${arg#--priority=}" ;;
+                            --role=*) role="${arg#--role=}" ;;
+                            --stance=*) stance="${arg#--stance=}" ;;
                             *) fail "unknown flag for campsite camp participant update: $arg" ;;
                         esac
                     done
 
-                    camp_participant_upsert "$project" "$participant_id" "$name" "$ptype" "$tool" "$terminal" "$fire_state" "$summary" "$blocker" "$next_action" "$priority"
+                    camp_participant_upsert "$project" "$participant_id" "$name" "$ptype" "$tool" "$terminal" "$fire_state" "$summary" "$blocker" "$next_action" "$priority" "$role" "$stance"
                     camp_event_append "$project" "$participant_id" "$old_state" "$fire_state" "${summary:-Updated participant state.}"
                     info "camp participant updated → $participant_id"
                     ;;
@@ -1032,8 +1038,86 @@ cmd_camp() {
                     ;;
             esac
             ;;
+        message)
+            local msg_action="${1:-}"
+            shift || true
+            camp_ensure_store "$project"
+            case "$msg_action" in
+                send)
+                    local from_id="" to_id="all" body=""
+                    for arg in "$@"; do
+                        case "$arg" in
+                            --from=*) from_id="${arg#--from=}" ;;
+                            --to=*)   to_id="${arg#--to=}" ;;
+                            *)        body="$arg" ;;
+                        esac
+                    done
+                    [[ -n "$from_id" ]] || fail "usage: campsite camp message send --from=<id> [--to=<id>] <body>"
+                    [[ -n "$body"    ]] || fail "message body required"
+                    local mid; mid="$(camp_message_send "$project" "$from_id" "$to_id" "$body")"
+                    info "message sent → $mid (flagged unresolved)"
+                    ;;
+                reply)
+                    local thread_id="${1:-}"
+                    shift || true
+                    local from_id="" body=""
+                    for arg in "$@"; do
+                        case "$arg" in
+                            --from=*) from_id="${arg#--from=}" ;;
+                            *)        body="$arg" ;;
+                        esac
+                    done
+                    [[ -n "$thread_id" ]] || fail "usage: campsite camp message reply <msg-id> --from=<id> <body>"
+                    [[ -n "$from_id"   ]] || fail "--from=<id> required"
+                    [[ -n "$body"      ]] || fail "reply body required"
+                    local mid; mid="$(camp_message_reply "$project" "$thread_id" "$from_id" "$body")"
+                    info "reply sent → $mid"
+                    ;;
+                list)
+                    local filter_unresolved=0 filter_thread=""
+                    for arg in "$@"; do
+                        case "$arg" in
+                            --unresolved) filter_unresolved=1 ;;
+                            --thread=*)   filter_thread="${arg#--thread=}" ;;
+                        esac
+                    done
+                    local messages_file; messages_file="$(camp_messages_path "$project")"
+                    if [[ ! -f "$messages_file" ]] || [[ "$(wc -l < "$messages_file")" -le 1 ]]; then
+                        info "(no messages yet — use 'campsite camp message send' to start a thread)"
+                        return 0
+                    fi
+                    printf '%-22s %-12s %-12s %-10s %s\n' "MSG-ID" "FROM" "TO" "FLAGS" "BODY"
+                    printf '%-22s %-12s %-12s %-10s %s\n' "------" "----" "--" "-----" "----"
+                    awk -F'\t' -v fu="$filter_unresolved" -v ft="$filter_thread" '
+                        NR==1 {next}
+                        fu==1 && $7!="unresolved" {next}
+                        ft!="" && $1!=ft && $6!=ft {next}
+                        {
+                            prefix = ($6 != "") ? "  \342\206\263 " : ""
+                            printf "%-22s %-12s %-12s %-10s %s\n", prefix $1, $3, $4, $7, $5
+                        }
+                    ' "$messages_file"
+                    ;;
+                flag)
+                    local msg_id="${1:-}"
+                    [[ -n "$msg_id" ]] || fail "usage: campsite camp message flag <msg-id>"
+                    camp_message_set_flag "$project" "$msg_id" "unresolved"
+                    info "message $msg_id flagged as unresolved"
+                    ;;
+                resolve)
+                    local msg_id="${1:-}"
+                    [[ -n "$msg_id" ]] || fail "usage: campsite camp message resolve <msg-id>"
+                    camp_message_set_flag "$project" "$msg_id" "resolved"
+                    info "message $msg_id resolved"
+                    ;;
+                *)
+                    fail "usage: campsite camp message <send|reply|list|flag|resolve>" \
+                         "send --from=<id> [--to=<id>] <body> | reply <msg-id> --from=<id> <body> | list [--unresolved] [--thread=<id>] | flag <msg-id> | resolve <msg-id>"
+                    ;;
+            esac
+            ;;
         "")
-            fail "usage: campsite camp <render|serve|overview|mission|participant> ..."
+            fail "usage: campsite camp <render|serve|overview|mission|participant|message> ..."
             ;;
         *)
             # Backward-compatible flag-only usage maps to render.
@@ -1046,7 +1130,7 @@ cmd_camp() {
                     --no-open)    no_open=1 ;;
                     --print-path) print_path=1 ;;
                     --legacy)     legacy=1 ;;
-                    *) fail "unknown camp command: $subcommand" "Valid commands: render, serve, overview, mission, participant" ;;
+                    *) fail "unknown camp command: $subcommand" "Valid commands: render, serve, overview, mission, participant, message" ;;
                 esac
             done
 
