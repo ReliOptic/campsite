@@ -336,3 +336,28 @@ teardown() {
     run camp_session_finish "$TEST_PROJECT" "ghost" "00000" "normal" "0"
     [[ "$status" -eq 0 ]]
 }
+
+# ---------------------------------------------------------------------------
+# relative_time
+# ---------------------------------------------------------------------------
+
+@test "relative_time: seconds < 60 returns Xs ago" {
+    local ts
+    ts="$(date -v-5S +%Y-%m-%dT%H:%M:%S)"
+    result="$(relative_time "$ts")"
+    [[ "$result" =~ ^[0-9]+s\ ago$ ]]
+}
+
+@test "relative_time: 65 seconds ago returns 1m ago" {
+    local ts
+    ts="$(date -v-65S +%Y-%m-%dT%H:%M:%S)"
+    result="$(relative_time "$ts")"
+    [[ "$result" == "1m ago" ]]
+}
+
+@test "relative_time: 2 hours ago returns 2h ago" {
+    local ts
+    ts="$(date -v-7200S +%Y-%m-%dT%H:%M:%S)"
+    result="$(relative_time "$ts")"
+    [[ "$result" == "2h ago" ]]
+}

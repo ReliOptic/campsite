@@ -242,3 +242,45 @@ _run_camp() {
     echo "$output" | grep -q "waiting-on-you:"
     echo "$output" | grep -q "next-move:"
 }
+
+@test "sync shows unresolved message hint after message send" {
+    _run_camp message send --from=pm-agent "is this the right approach?"
+
+    run bash -c "
+        export CAMPSITE_HOME='$CAMPSITE_HOME'
+        export CAMPSITE_DISABLE_PHASER=1
+        cd '$TEST_PROJECT'
+        '$PROJECT_ROOT/bin/campsite' sync --adapter=claude 2>&1
+    "
+
+    [[ "$status" -eq 0 ]]
+    echo "$output" | grep -qE "unresolved|message"
+}
+
+@test "peek shows unresolved message hint after message send" {
+    _run_camp message send --from=pm-agent "review needed"
+
+    run bash -c "
+        export CAMPSITE_HOME='$CAMPSITE_HOME'
+        export CAMPSITE_ROOT='$PROJECT_ROOT'
+        source '$PROJECT_ROOT/lib/compat.sh'
+        source '$PROJECT_ROOT/lib/common.sh'
+        source '$PROJECT_ROOT/lib/detect.sh'
+        source '$PROJECT_ROOT/lib/lock.sh'
+        source '$PROJECT_ROOT/lib/hash.sh'
+        source '$PROJECT_ROOT/lib/security.sh'
+        source '$PROJECT_ROOT/lib/compile.sh'
+        source '$PROJECT_ROOT/lib/history.sh'
+        source '$PROJECT_ROOT/lib/ui.sh'
+        source '$PROJECT_ROOT/lib/camp.sh'
+        [[ -f '$PROJECT_ROOT/config/defaults.sh' ]] && source '$PROJECT_ROOT/config/defaults.sh'
+        source '$PROJECT_ROOT/bin/campsite'
+        cd '$TEST_PROJECT'
+        lock_acquire '$TEST_PROJECT' tester claude
+        camp_session_start '$TEST_PROJECT' claude \$\$ 'test-tty' >/dev/null
+        cmd_peek 2>&1
+    "
+
+    [[ "$status" -eq 0 ]]
+    echo "$output" | grep -qE "unresolved|message"
+}

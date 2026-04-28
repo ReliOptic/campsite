@@ -140,3 +140,29 @@ teardown() {
     [[ "$status" -eq 0 ]]
     git log --oneline -1 | grep -q "checkpoint:"
 }
+
+@test "save --push --include-new commits untracked file" {
+    cd "$TEST_PROJECT"
+
+    git init -b master >/dev/null 2>&1
+    git config user.name "Test User"
+    git config user.email "test@example.com"
+    git add .
+    git commit -m "initial" >/dev/null 2>&1
+
+    local bare_remote="$TEST_TEMP_DIR/remote.git"
+    git init --bare "$bare_remote" >/dev/null 2>&1
+    git remote add origin "$bare_remote"
+    git push -u origin master >/dev/null 2>&1
+
+    echo "new untracked content" > "$TEST_PROJECT/new-file.md"
+
+    run bash -c "
+        export CAMPSITE_HOME='$CAMPSITE_HOME'
+        cd '$TEST_PROJECT'
+        '$PROJECT_ROOT/bin/campsite' save --push --include-new
+    "
+
+    [[ "$status" -eq 0 ]]
+    git show HEAD --name-only | grep -q "new-file.md"
+}
