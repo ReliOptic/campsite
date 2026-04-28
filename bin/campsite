@@ -60,8 +60,9 @@ usage:
   campsite setup          First-run guided setup
   campsite init [path]    Bootstrap a new campsite project
   campsite sync           Compile source of truth → agent context files
-  campsite save           Verify updates + cleanup + unlock
-  campsite save --push    Create and push a safe checkpoint commit
+  campsite save                      Verify updates + cleanup + unlock
+  campsite save --push               Create and push a safe checkpoint commit
+  campsite save --push --include-new Stage all untracked files before checkpoint commit
   campsite status         Current project state summary
   campsite peek           View active session from another terminal
   campsite go [name|#]    Jump to recent project (cd + optional sync)
@@ -72,6 +73,10 @@ usage:
   campsite camp render --legacy   Force legacy HTML renderer
   campsite camp serve     Live camp server with auto-refresh (http://localhost:8470)
   campsite camp serve --legacy    Force legacy HTML server
+  campsite camp overview          Print camp state summary
+  campsite camp mission set <t>   Set mission title
+  campsite camp participant ...   Manage participants (enter|update|list|remove)
+  campsite camp message ...       Send/reply/list/flag/resolve messages
   campsite workspace set <path>   Set workspace root
 
   campsite export         Export camp state as JSON to stdout (also writes .campsite/camp/camp.json)
@@ -306,6 +311,9 @@ cmd_sync() {
     sync_device="$(detect_device 2>/dev/null || echo "unknown")"
     history_append "$project" "$sync_adapter_name" "$sync_device" "$(now_iso)" "0" "sync"
     info "sync complete — run 'campsite' to launch, or 'campsite status' to review"
+
+    local _unresolved; _unresolved="$(camp_messages_unresolved_count "$project" 2>/dev/null || echo 0)"
+    [[ "$_unresolved" -gt 0 ]] && warn "$_unresolved unresolved message(s) waiting — campsite camp message list --unresolved"
 }
 
 _checkpoint_commit_message() {
@@ -323,6 +331,7 @@ _git_repo_root() {
 
 _save_git_checkpoint_push() {
     local project="$1"
+    local include_new="${2:-0}"
     local repo_root branch
     repo_root="$(_git_repo_root "$project")" || {
         info "save --push skipped: project is not inside a git repository"
@@ -332,7 +341,12 @@ _save_git_checkpoint_push() {
     branch="$(git -C "$repo_root" branch --show-current 2>/dev/null || echo "")"
     [[ -n "$branch" ]] || branch="master"
 
-    git -C "$repo_root" add -u || return 1
+    if [[ "$include_new" == "1" ]]; then
+        info "including untracked files"
+        git -C "$repo_root" add . || return 1
+    else
+        git -C "$repo_root" add -u || return 1
+    fi
     if ! git -C "$repo_root" diff --cached --quiet --exit-code; then
         local message
         message="$(_checkpoint_commit_message "$project")"
@@ -349,10 +363,12 @@ _save_git_checkpoint_push() {
 # --- campsite save ---
 cmd_save() {
     local do_push="${CAMPSITE_SAVE_PUSH:-0}"
+    local include_new=0
     for arg in "$@"; do
         case "$arg" in
-            --push) do_push=1 ;;
-            *) fail "unknown flag for campsite save: $arg" "Valid flags: --push" ;;
+            --push)         do_push=1 ;;
+            --include-new)  include_new=1 ;;
+            *) fail "unknown flag for campsite save: $arg" "Valid flags: --push, --include-new" ;;
         esac
     done
 
@@ -421,7 +437,7 @@ cmd_save() {
     printf '\n'
 
     if [[ "$do_push" == "1" ]]; then
-        _save_git_checkpoint_push "$project"
+        _save_git_checkpoint_push "$project" "$include_new"
     fi
 }
 
@@ -534,7 +550,7 @@ _validate_project() {
     # Phase validation
     local phase
     phase="$(field_value "$project/status.md" "phase")"
-    [[ -n "$phase" ]] || fail "missing status phase" "Add '- phase: building' to status.md (valid: starting building reviewing complete blocked)"
+    [[ -n "$phase" ]] || fail "missing status phase" "Add '- phase: building' to status.md (valid: discovery building testing reviewing blocked deployed)"
     
     local valid_phases="${CAMPSITE_VALID_PHASES:-discovery building testing reviewing blocked deployed}"
     local phase_valid=0
@@ -1021,7 +1037,7 @@ cmd_camp() {
                     done < "$tsv"
                     ;;
                 remove)
-                    local participant_id="${2:-}"
+                    local participant_id="${1:-}"
                     [[ -z "$participant_id" ]] && fail "usage: campsite camp participant remove <id>"
                     local camp_dir="$project/.campsite/camp"
                     local tsv="$camp_dir/participants.tsv"
@@ -1049,7 +1065,7 @@ cmd_camp() {
                         case "$arg" in
                             --from=*) from_id="${arg#--from=}" ;;
                             --to=*)   to_id="${arg#--to=}" ;;
-                            *)        body="$arg" ;;
+                            *)        body="${body:+$body }$arg" ;;
                         esac
                     done
                     [[ -n "$from_id" ]] || fail "usage: campsite camp message send --from=<id> [--to=<id>] <body>"
@@ -1708,6 +1724,9 @@ cmd_peek() {
     else
         _peek_print
     fi
+
+    local _unresolved; _unresolved="$(camp_messages_unresolved_count "$project" 2>/dev/null || echo 0)"
+    [[ "$_unresolved" -gt 0 ]] && warn "$_unresolved unresolved message(s) waiting — campsite camp message list --unresolved"
 }
 
 # --- campsite go [name|number] [--sync] — quick-jump to recent project ---

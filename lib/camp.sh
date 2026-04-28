@@ -48,6 +48,21 @@ camp_session_snapshot_path() {
     printf '%s/%s.meta' "$(camp_sessions_dir "$project_root")" "$participant_id"
 }
 
+relative_time() {
+    local iso="${1:-}"
+    [[ -z "$iso" ]] && { printf '—'; return; }
+    local epoch now_epoch diff
+    epoch=$(date -j -f "%Y-%m-%dT%H:%M:%S" "${iso%%[.+Z]*}" +%s 2>/dev/null) \
+        || { printf '%s' "$iso"; return; }
+    now_epoch=$(date +%s)
+    diff=$(( now_epoch - epoch ))
+    if   [[ $diff -lt 60    ]]; then printf '%ds ago' "$diff"
+    elif [[ $diff -lt 3600  ]]; then printf '%dm ago' $(( diff / 60 ))
+    elif [[ $diff -lt 86400 ]]; then printf '%dh ago' $(( diff / 3600 ))
+    else                              printf '%dd ago' $(( diff / 86400 ))
+    fi
+}
+
 camp_html_escape() {
     sed \
         -e 's/&/\&amp;/g' \
@@ -414,6 +429,7 @@ camp_overview_lines() {
         $6 == "modakbul" { active[++active_n] = $2 }
         $6 == "deungbul" || $6 == "yeongi" { waiting[++wait_n] = $2 " (" $6 ")" }
         $6 == "jangjak" && next_action == "" { next_action = $9; next_name = $2 }
+        NR > 1 && $10 != "" { print "PARTICIPANT\t" $2 "\t" $10 }
         END {
             active_line = ""
             for (i = 1; i <= active_n; i++) {
@@ -451,12 +467,13 @@ camp_overview_print() {
     printf '\n'
     printf "  ${_C_BOLD:-}camp overview${_C_RESET:-}\n"
     printf "  mission: %s\n" "$mission_title"
-    while IFS=$'\t' read -r label value; do
+    while IFS=$'\t' read -r label value extra; do
         case "$label" in
-            ACTIVE)  printf "  working-now: %s\n" "$value" ;;
-            WAITING) printf "  waiting-on-you: %s\n" "$value" ;;
-            NEXT)    printf "  next-move: %s\n" "$value" ;;
-            MSGS)    printf "  messages: %s\n" "$value" ;;
+            ACTIVE)      printf "  working-now: %s\n" "$value" ;;
+            WAITING)     printf "  waiting-on-you: %s\n" "$value" ;;
+            NEXT)        printf "  next-move: %s\n" "$value" ;;
+            MSGS)        printf "  messages: %s\n" "$value" ;;
+            PARTICIPANT) printf "  last-seen: %s — %s\n" "$value" "$(relative_time "$extra")" ;;
         esac
     done < <(camp_overview_lines "$project_root")
     printf '\n'
@@ -529,8 +546,8 @@ camp_render() {
         NR == 1 { next }
         {
             if (NR > 2) printf ","
-            printf "{\"name\":\"%s\",\"state\":\"%s\",\"summary\":\"%s\",\"blocker\":\"%s\",\"next\":\"%s\",\"tool\":\"%s\",\"terminal\":\"%s\"}",
-                esc($2), esc($6), esc($7), esc($8), esc($9), esc($4), esc($5)
+            printf "{\"name\":\"%s\",\"state\":\"%s\",\"summary\":\"%s\",\"blocker\":\"%s\",\"next\":\"%s\",\"tool\":\"%s\",\"terminal\":\"%s\",\"lastSeen\":\"%s\"}",
+                esc($2), esc($6), esc($7), esc($8), esc($9), esc($4), esc($5), esc($10)
         }
     ' "$participants_file")"
 
@@ -893,7 +910,18 @@ EOF
         if (p.next) detailHtml += '<span class="detail-label">Next action</span><span class="detail-next">' + esc(p.next) + '</span>';
         detailHtml += '<span class="detail-label">Resume</span><span class="detail-resume">' + esc(p.tool) + ' in ' + esc(p.terminal) + '</span>';
         const icoSvg = '<svg width="12" height="12"><use href="#ico-' + p.state + '"/></svg>';
-        el.innerHTML = '<div class="participant-header"><span class="participant-name">' + esc(p.name) + '</span><span class="state-chip state-' + p.state + '">' + icoSvg + label + '</span></div><div class="participant-detail">' + detailHtml + '</div>';
+        let lastSeenStr = "";
+        if (p.lastSeen) {
+          const d = new Date(p.lastSeen), now = new Date(), s = Math.floor((now - d) / 1000);
+          if (!isNaN(s)) {
+            if (s < 60) lastSeenStr = s + "s ago";
+            else if (s < 3600) lastSeenStr = Math.floor(s/60) + "m ago";
+            else if (s < 86400) lastSeenStr = Math.floor(s/3600) + "h ago";
+            else lastSeenStr = Math.floor(s/86400) + "d ago";
+          }
+        }
+        const lastSeenHtml = lastSeenStr ? '<span style="font-size:10px;color:var(--muted);margin-left:8px">' + lastSeenStr + '</span>' : '';
+        el.innerHTML = '<div class="participant-header"><span class="participant-name">' + esc(p.name) + lastSeenHtml + '</span><span class="state-chip state-' + p.state + '">' + icoSvg + label + '</span></div><div class="participant-detail">' + detailHtml + '</div>';
         el.onclick = () => {
           const d = el.querySelector(".participant-detail");
           d.style.display = d.style.display === "block" ? "none" : "block";
