@@ -547,6 +547,24 @@ camp_render() {
         last_activity_html="$(printf '%s' "$last_activity_iso" | camp_html_escape)"
     fi
 
+    # Build messages JSON
+    local messages_file messages_json unresolved_count
+    messages_file="$(camp_messages_path "$project_root")"
+    unresolved_count=0
+    messages_json=""
+    if [[ -f "$messages_file" ]]; then
+        unresolved_count="$(awk -F'\t' 'NR>1 && $7=="unresolved" {c++} END {print c+0}' "$messages_file")"
+        messages_json="$(awk -F'\t' '
+            function esc(s) { gsub(/\\/, "\\\\", s); gsub(/"/, "\\\"", s); gsub(/\n/, " ", s); return s }
+            NR == 1 { next }
+            {
+                if (NR > 2) printf ","
+                printf "{\"id\":\"%s\",\"ts\":\"%s\",\"from\":\"%s\",\"to\":\"%s\",\"body\":\"%s\",\"thread\":\"%s\",\"flags\":\"%s\"}",
+                    esc($1), esc($2), esc($3), esc($4), esc($5), esc($6), esc($7)
+            }
+        ' "$messages_file")"
+    fi
+
     # Check for campfire-core asset (base64 inline if small enough)
     local campfire_b64=""
     local export_dir
@@ -653,6 +671,19 @@ camp_render() {
     /* State summary bar */
     .state-bar { display: flex; gap: 2px; height: 4px; margin-bottom: 16px; border-radius: 0; overflow: hidden; }
     .state-bar-seg { height: 100%; transition: width 0.5s ease; }
+    .messages { margin-bottom: 28px; }
+    .messages-label { font-family: "Space Grotesk", system-ui, sans-serif; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+    .msg-thread { background: var(--card); border-radius: 8px; padding: 12px 14px; margin-bottom: 8px; border-left: 3px solid transparent; }
+    .msg-thread.unresolved { border-left-color: var(--review); }
+    .msg-thread.resolved { border-left-color: var(--ready); opacity: 0.65; }
+    .msg-meta { display: flex; gap: 8px; align-items: center; font-size: 11px; color: var(--muted); margin-bottom: 5px; flex-wrap: wrap; }
+    .msg-from { color: var(--cyan); font-weight: 500; }
+    .msg-arrow { opacity: 0.4; }
+    .msg-flags { font-size: 10px; padding: 2px 7px; border-radius: 10px; background: rgba(246,211,101,0.15); color: var(--review); }
+    .msg-flags.resolved { background: rgba(127,217,143,0.15); color: var(--ready); }
+    .msg-body { font-size: 13px; line-height: 1.5; color: var(--text); }
+    .msg-reply { margin-top: 8px; padding: 8px 0 0 12px; border-top: 1px solid rgba(255,255,255,0.05); }
+    .msg-resolve-hint { font-size: 10px; color: var(--muted); margin-top: 7px; font-family: monospace; opacity: 0.6; }
 
     /* Footer */
     .camp-footer { color: var(--muted); font-size: 11px; padding-top: 12px; display: flex; justify-content: space-between; align-items: center; }
@@ -783,6 +814,11 @@ camp_render() {
       <div id="participant-list"></div>
     </section>
 
+    <section class="messages" id="messages-section" style="display:none">
+      <div class="messages-label">Threads</div>
+      <div id="message-list"></div>
+    </section>
+
     <div class="state-bar" id="state-bar"></div>
     <footer class="camp-footer">
       <span id="camp-footer"></span>
@@ -802,6 +838,8 @@ HTMLEOF
       waitingOnYou: "${waiting_line_html}",
       nextMove: "${next_line_html}",
       participantCount: ${participant_count},
+      unresolvedCount: ${unresolved_count},
+      messages: [${messages_json}],
       participants: [${participant_json}],
       lastActivity: "${last_activity_html}"
     };
@@ -885,6 +923,36 @@ EOF
         seg.title = s + ": " + counts[s];
         bar.appendChild(seg);
       });
+    })();
+
+    // Messages panel
+    (function() {
+      if (!DATA.messages || DATA.messages.length === 0) return;
+      document.getElementById("messages-section").style.display = "block";
+      const list = document.getElementById("message-list");
+      const roots = DATA.messages.filter(function(m) { return !m.thread; });
+      const replies = {};
+      DATA.messages.filter(function(m) { return m.thread; }).forEach(function(m) {
+        (replies[m.thread] = replies[m.thread] || []).push(m);
+      });
+      roots.forEach(function(m) {
+        const div = document.createElement("div");
+        div.className = "msg-thread " + (m.flags || "");
+        let html = '<div class="msg-meta"><span class="msg-from">' + esc(m.from) + '</span>';
+        if (m.to && m.to !== "all") html += '<span class="msg-arrow">→</span><span class="msg-to">' + esc(m.to) + '</span>';
+        if (m.flags) html += '<span class="msg-flags ' + m.flags + '">' + m.flags + '</span>';
+        html += '</div><div class="msg-body">' + esc(m.body) + '</div>';
+        (replies[m.id] || []).forEach(function(r) {
+          html += '<div class="msg-reply"><div class="msg-meta"><span class="msg-from">' + esc(r.from) + '</span></div><div class="msg-body">' + esc(r.body) + '</div></div>';
+        });
+        if (m.flags === "unresolved") {
+          html += '<div class="msg-resolve-hint">campsite camp message resolve ' + esc(m.id) + '</div>';
+        }
+        div.innerHTML = html;
+        list.appendChild(div);
+      });
+      document.getElementById("camp-footer").textContent +=
+        " · " + DATA.unresolvedCount + " unresolved thread" + (DATA.unresolvedCount === 1 ? "" : "s");
     })();
 
     // Generate stars
