@@ -2,11 +2,12 @@
 
 ## Next Action
 
-- task: 디자인 에셋 생성 — design/image_prompt.md 프롬프트로 첫 6종 pixel art 생성 후 design/export/에 배치
+- task: Phase 5 시각 자산 생산 1차 — 화로 코어 + 5종 화로 상태 아이콘
 - priority: medium
 - estimated-scope: medium
 - entry-point: design/image_prompt.md, design/export/
 - precondition: make check 223/223 통과 (master, origin 동기화 완료)
+- roadmap: docs/completion-roadmap.md (v0.2.0 → v1.0 단계별 계획)
 
 ## Context for Next Session
 
