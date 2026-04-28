@@ -157,10 +157,18 @@ Completed work:
 
 Remaining:
 
-- integration tests for `campsite camp message` not yet written
+- integration tests for `campsite camp message` are complete (see Step 9)
+
+### Step 9. Message Integration Tests
+
+Status: `completed`
+
+Completed work:
+
+- 7 integration tests added to `tests/integration/test_camp.bats`: send, reply, list, list --unresolved, resolve, flag, overview MSGS escalation
+- make check: 172 unit + 45 integration = 217 tests, all passing
 
 ## Current Next Move
 
-- add integration tests for `campsite camp message` (send/reply/list/flag/resolve) in tests/integration/test_camp.bats
 - consider pixel art asset generation (design/image_prompt.md → design/export/)
-- remote push: master is ahead 4 commits of origin/master
+- remote push: master is ahead 5+ commits of origin/master

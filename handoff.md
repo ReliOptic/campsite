@@ -2,12 +2,11 @@
 
 ## Next Action
 
-- task: campsite camp message 통합 테스트 추가 — tests/integration/test_camp.bats에 send/reply/list/flag/resolve 커버리지
-- fallback-task: 디자인 에셋 생성 — design/image_prompt.md 프롬프트로 첫 6종 pixel art 생성 후 design/export/에 배치
-- priority: high
-- estimated-scope: small
-- entry-point: tests/integration/test_camp.bats, lib/camp.sh (camp_message_* 함수들)
-- precondition: make check 210/210 통과 (master, ahead 4 of remote)
+- task: 디자인 에셋 생성 — design/image_prompt.md 프롬프트로 첫 6종 pixel art 생성 후 design/export/에 배치
+- priority: medium
+- estimated-scope: medium
+- entry-point: design/image_prompt.md, design/export/
+- precondition: make check 217/217 통과 (master, ahead 5+ of remote)
 
 ## Context for Next Session
 
@@ -39,3 +38,4 @@ Phase 4 완료: `campsite camp message` (send/reply/list/flag/resolve), particip
 | 2026-04-28 | claude-sonnet | Applied 14 HIGH/MEDIUM UX improvements: sync completion message, fail() recovery hints, empty state text, next-move double prefix, participant list/remove, Session Log truncation, template cleanup | CLI UX quality review items resolved |
 | 2026-04-28 | claude-sonnet | Phase 4: campsite camp message (send/reply/list/flag/resolve), role/stance on participants (TSV cols 12-13), unresolved escalation in overview and dashboard | Inter-agent async messaging channel live |
 | 2026-04-28 | claude-sonnet | HTML camp dashboard Threads panel: amber highlight for unresolved, threaded reply indentation, resolve command hint in footer | Dashboard shows message state alongside participant state |
+| 2026-04-28 | claude-sonnet | 7 integration tests for campsite camp message (send/reply/list/list-unresolved/resolve/flag/overview) | make check 217/217 green |

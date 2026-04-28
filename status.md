@@ -53,12 +53,12 @@
 - make check passes: 172 unit + 38 integration tests (210 total) on local and CI.
 - Phase 4: `campsite camp message` (send/reply/list/flag/resolve), role/stance on participants, unresolved thread escalation in overview and dashboard.
 - HTML camp dashboard now shows Threads panel with amber highlight for unresolved, reply indentation, and resolve command hint.
+- `campsite camp message` has 7 integration tests: send, reply, list, list --unresolved, resolve, flag, overview MSGS line. make check 172 unit + 45 integration = 217 total, all passing.
 
 ## What Does Not Work Yet
 
 - No generated pixel art assets — `design/export/` is empty, Phaser storyworld is inactive.
 - Participant `last_seen` displays raw ISO 8601 timestamps (relative time conversion not implemented).
-- `campsite camp message` has no integration tests yet.
 
 ## Blockers
 

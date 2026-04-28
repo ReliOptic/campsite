@@ -138,6 +138,83 @@ _run_camp() {
     grep -q "next task updated\|finished with changes" "$TEST_PROJECT/.campsite/camp/events.tsv"
 }
 
+@test "message send creates messages.tsv entry flagged unresolved" {
+    _run_camp message send --from=pm-agent "is this the right architecture?"
+
+    [[ "$status" -eq 0 ]]
+    [[ -f "$TEST_PROJECT/.campsite/camp/messages.tsv" ]]
+    awk -F'\t' 'NR>1 && $3=="pm-agent" && $7=="unresolved"' \
+        "$TEST_PROJECT/.campsite/camp/messages.tsv" | grep -q '.'
+}
+
+@test "message reply creates entry with thread_id referencing original" {
+    _run_camp message send --from=pm-agent "initial question"
+    local mid
+    mid=$(awk -F'\t' 'NR==2{print $1}' "$TEST_PROJECT/.campsite/camp/messages.tsv")
+
+    _run_camp message reply "$mid" --from=eng-agent "my answer"
+
+    [[ "$status" -eq 0 ]]
+    awk -F'\t' -v tid="$mid" 'NR>1 && $6==tid' \
+        "$TEST_PROJECT/.campsite/camp/messages.tsv" | grep -q '.'
+}
+
+@test "message list shows table header and message rows" {
+    _run_camp message send --from=pm-agent "first message"
+    _run_camp message list
+
+    [[ "$status" -eq 0 ]]
+    echo "$output" | grep -q 'MSG-ID'
+    echo "$output" | grep -q 'pm-agent'
+}
+
+@test "message list --unresolved excludes resolved messages" {
+    _run_camp message send --from=eng-agent "will be resolved"
+    local mid
+    mid=$(awk -F'\t' 'NR==2{print $1}' "$TEST_PROJECT/.campsite/camp/messages.tsv")
+    _run_camp message resolve "$mid"
+
+    _run_camp message send --from=pm-agent "still open"
+    _run_camp message list --unresolved
+
+    [[ "$status" -eq 0 ]]
+    echo "$output" | grep -q 'pm-agent'
+    ! echo "$output" | grep -q 'eng-agent'
+}
+
+@test "message resolve sets flag to resolved" {
+    _run_camp message send --from=pm-agent "needs resolution"
+    local mid
+    mid=$(awk -F'\t' 'NR==2{print $1}' "$TEST_PROJECT/.campsite/camp/messages.tsv")
+
+    _run_camp message resolve "$mid"
+
+    [[ "$status" -eq 0 ]]
+    awk -F'\t' -v mid="$mid" 'NR>1 && $1==mid && $7=="resolved"' \
+        "$TEST_PROJECT/.campsite/camp/messages.tsv" | grep -q '.'
+}
+
+@test "message flag sets flag back to unresolved" {
+    _run_camp message send --from=pm-agent "to be flagged"
+    local mid
+    mid=$(awk -F'\t' 'NR==2{print $1}' "$TEST_PROJECT/.campsite/camp/messages.tsv")
+    _run_camp message resolve "$mid"
+
+    _run_camp message flag "$mid"
+
+    [[ "$status" -eq 0 ]]
+    awk -F'\t' -v mid="$mid" 'NR>1 && $1==mid && $7=="unresolved"' \
+        "$TEST_PROJECT/.campsite/camp/messages.tsv" | grep -q '.'
+}
+
+@test "camp overview shows messages line when unresolved count is positive" {
+    _run_camp message send --from=pm-agent "unresolved thread"
+    _run_camp overview
+
+    [[ "$status" -eq 0 ]]
+    echo "$output" | grep -q 'messages:'
+}
+
 @test "peek includes camp overview summary when camp state exists" {
     run bash -c "
         export CAMPSITE_HOME='$CAMPSITE_HOME'
