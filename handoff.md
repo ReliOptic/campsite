@@ -6,11 +6,11 @@
 - priority: medium
 - estimated-scope: medium
 - entry-point: design/image_prompt.md, design/export/
-- precondition: make check 217/217 통과 (master, ahead 5+ of remote)
+- precondition: make check 223/223 통과 (master, origin 동기화 완료)
 
 ## Context for Next Session
 
-Phase 4 완료: `campsite camp message` (send/reply/list/flag/resolve), participants에 role/stance 컬럼 추가, camp overview에 unresolved 에스컬레이션, HTML 대시보드에 Threads 패널(amber 강조, 답글 들여쓰기, resolve 힌트). 14건 UX 개선(sync 완료 메시지, fail() 힌트, 빈 상태 문구, next-move 이중 접두어 제거 등) 및 8건 통합 테스트 버그 수정 완료. make check 210/210 로컬 통과. 4개 커밋 remote push 전 상태.
+Phase 4 완료 + 기능 점검 완료. `campsite camp message` (send/reply/list/flag/resolve), participants role/stance 컬럼, camp overview unresolved 에스컬레이션, HTML Threads 패널. participant list IFS 탭 붕괴 버그 → awk NR>1 교체, participant remove camp_log_event undefined → camp_event_append 교체, ${2:-} positional arg 버그 수정. make check 223/223 통과, origin 동기화 완료. 다음 작업: design/export/ pixel art 에셋 생성.
 
 ## Open Questions
 
@@ -39,3 +39,4 @@ Phase 4 완료: `campsite camp message` (send/reply/list/flag/resolve), particip
 | 2026-04-28 | claude-sonnet | Phase 4: campsite camp message (send/reply/list/flag/resolve), role/stance on participants (TSV cols 12-13), unresolved escalation in overview and dashboard | Inter-agent async messaging channel live |
 | 2026-04-28 | claude-sonnet | HTML camp dashboard Threads panel: amber highlight for unresolved, threaded reply indentation, resolve command hint in footer | Dashboard shows message state alongside participant state |
 | 2026-04-28 | claude-sonnet | 7 integration tests for campsite camp message (send/reply/list/list-unresolved/resolve/flag/overview) | make check 217/217 green |
+| 2026-04-28 | claude-sonnet | 기능 점검: participant list IFS 탭 붕괴 → awk 교체, remove camp_log_event undefined → camp_event_append, ${2:-} positional arg 수정 | make check 223/223, origin push 완료 |
