@@ -421,8 +421,7 @@ cmd_save() {
     fi
 
     printf '\n'
-    printf '  \033[32m◎\033[0m  좋아요! 다음에 돌아오면 바로 시작할 수 있어요.\n'
-    printf '     (session saved — context synced for next launch)\n'
+    printf '  \033[32m◎\033[0m  session saved — context synced for next launch\n'
 
     # Brief camp state after save
     local next_val=""
@@ -686,19 +685,19 @@ cmd_dashboard() {
         # Truncate task to 40 chars
         [[ ${#task} -gt 40 ]] && task="${task:0:37}..."
 
-        local lock_status
+        local lock_text lock_color
         if lock_is_held "$project" 2>/dev/null; then
             local held_tool
             held_tool="$(field_value_plain "$(lock_path "$project")/pid" "tool" 2>/dev/null || echo "?")"
-            lock_status="${_C_RED:-}locked${_C_RESET:-}($held_tool)"
+            lock_text="locked($held_tool)"; lock_color="${_C_RED:-}"
         elif [[ -d "$(lock_path "$project")" ]]; then
-            lock_status="${_C_YELLOW:-}orphaned${_C_RESET:-}"
+            lock_text="orphaned"; lock_color="${_C_YELLOW:-}"
         else
-            lock_status="${_C_GREEN:-}free${_C_RESET:-}"
+            lock_text="free"; lock_color="${_C_GREEN:-}"
         fi
 
-        printf "  %-20s │ %-10s │ %-10s │ %-12b │ %s\n" \
-            "$name" "$phase" "$confidence" "$lock_status" "$task"
+        printf "  %-20s │ %-10s │ %-10s │ %s%-12s%s │ %s\n" \
+            "$name" "$phase" "$confidence" "$lock_color" "$lock_text" "${_C_RESET:-}" "$task"
     done < <(detect_all_projects "$workspace" 2>/dev/null)
 
     printf '\n'
@@ -1133,7 +1132,7 @@ cmd_camp() {
             esac
             ;;
         "")
-            fail "usage: campsite camp <render|serve|overview|mission|participant|message> ..."
+            fail "usage: campsite camp <render|serve|overview|mission|participant|message|export> ..."
             ;;
         *)
             # Backward-compatible flag-only usage maps to render.
@@ -1673,7 +1672,7 @@ cmd_peek() {
         if [[ "$started" != "?" ]]; then
             local start_epoch now_epoch elapsed
             start_epoch="$(date -d "$started" +%s 2>/dev/null \
-                || date -j -f '%Y-%m-%dT%H:%M:%SZ' "$started" +%s 2>/dev/null \
+                || date -j -f '%Y-%m-%dT%H:%M:%S' "${started%%[.Z+]*}" +%s 2>/dev/null \
                 || echo 0)"
             now_epoch="$(date +%s)"
             elapsed=$(( now_epoch - start_epoch ))
@@ -1881,6 +1880,8 @@ first_run_flow() {
     if [[ -n "$mission_title" ]]; then
         camp_set_mission "$project_root" "$mission_title"
         info "mission set: $mission_title"
+    else
+        info "미션은 나중에 'campsite camp mission' 으로 설정할 수 있어요."
     fi
 
     # 4. Record first-run event

@@ -601,7 +601,7 @@ camp_render() {
 
     cat > "$output_path" <<'HTMLEOF'
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -892,7 +892,7 @@ EOF
     document.getElementById("working-now").textContent = DATA.workingNow;
     document.getElementById("waiting-on-you").textContent = DATA.waitingOnYou;
     document.getElementById("next-move").textContent = DATA.nextMove;
-    document.getElementById("camp-footer").textContent = DATA.participantCount + (DATA.participantCount === 1 ? " participant" : " participants") + " in camp";
+    document.getElementById("camp-footer").textContent = DATA.participantCount + "명 활동 중";
 
     const list = document.getElementById("participant-list");
     if (DATA.participants.length === 0) {
@@ -904,12 +904,16 @@ EOF
         const el = document.createElement("div");
         el.className = "participant";
         el.setAttribute("data-state", p.state);
+        el.setAttribute("role", "button");
+        el.setAttribute("tabindex", "0");
+        el.setAttribute("aria-expanded", "false");
         const label = stateLabels[p.state] || p.state;
         let detailHtml = '<span class="detail-label">Summary</span>' + esc(p.summary);
         if (p.blocker) detailHtml += '<span class="detail-label">Blocker</span><span class="detail-blocker">' + esc(p.blocker) + '</span>';
         if (p.next) detailHtml += '<span class="detail-label">Next action</span><span class="detail-next">' + esc(p.next) + '</span>';
         detailHtml += '<span class="detail-label">Resume</span><span class="detail-resume">' + esc(p.tool) + ' in ' + esc(p.terminal) + '</span>';
-        const icoSvg = '<svg width="12" height="12"><use href="#ico-' + p.state + '"/></svg>';
+        const icoSvg = '<svg width="12" height="12" aria-hidden="true"><use href="#ico-' + p.state + '"/></svg>';
+        const stateChip = '<span class="state-chip state-' + p.state + '" aria-label="state: ' + label + '">' + icoSvg + label + '</span>';
         let lastSeenStr = "";
         if (p.lastSeen) {
           const d = new Date(p.lastSeen), now = new Date(), s = Math.floor((now - d) / 1000);
@@ -921,11 +925,14 @@ EOF
           }
         }
         const lastSeenHtml = lastSeenStr ? '<span style="font-size:10px;color:var(--muted);margin-left:8px">' + lastSeenStr + '</span>' : '';
-        el.innerHTML = '<div class="participant-header"><span class="participant-name">' + esc(p.name) + lastSeenHtml + '</span><span class="state-chip state-' + p.state + '">' + icoSvg + label + '</span></div><div class="participant-detail">' + detailHtml + '</div>';
+        el.innerHTML = '<div class="participant-header"><span class="participant-name">' + esc(p.name) + lastSeenHtml + '</span>' + stateChip + '</div><div class="participant-detail">' + detailHtml + '</div>';
         el.onclick = () => {
           const d = el.querySelector(".participant-detail");
-          d.style.display = d.style.display === "block" ? "none" : "block";
+          const open = d.style.display === "block";
+          d.style.display = open ? "none" : "block";
+          el.setAttribute("aria-expanded", String(!open));
         };
+        el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); el.click(); } };
         list.appendChild(el);
       });
     }
@@ -955,9 +962,14 @@ EOF
 
     // Messages panel
     (function() {
-      if (!DATA.messages || DATA.messages.length === 0) return;
-      document.getElementById("messages-section").style.display = "block";
+      const section = document.getElementById("messages-section");
+      section.style.display = "block";
       const list = document.getElementById("message-list");
+      if (!DATA.messages || DATA.messages.length === 0) {
+        list.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px 0">대화가 아직 없어요 — <code>campsite camp message send</code> 로 시작해보세요.</div>';
+        return;
+      }
+      list.innerHTML = "";
       const roots = DATA.messages.filter(function(m) { return !m.thread; });
       const replies = {};
       DATA.messages.filter(function(m) { return m.thread; }).forEach(function(m) {
