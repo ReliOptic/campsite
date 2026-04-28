@@ -1031,9 +1031,7 @@ cmd_camp() {
                     fi
                     printf '%-20s %-20s %-10s %-10s %s\n' "ID" "Name" "State" "Tool" "Summary"
                     printf '%-20s %-20s %-10s %-10s %s\n' "----" "----" "-----" "----" "-------"
-                    while IFS=$'\t' read -r id name ptype tool terminal state summary rest; do
-                        printf '%-20s %-20s %-10s %-10s %s\n' "$id" "$name" "$state" "$tool" "$summary"
-                    done < "$tsv"
+                    awk -F'\t' 'NR>1 {printf "%-20s %-20s %-10s %-10s %s\n", $1, $2, $6, $4, $7}' "$tsv"
                     ;;
                 remove)
                     local participant_id="${1:-}"
@@ -1045,7 +1043,7 @@ cmd_camp() {
                     fi
                     local tmp; tmp="$(mktemp)"
                     grep -v "^$participant_id"$'\t' "$tsv" > "$tmp" && mv "$tmp" "$tsv"
-                    camp_log_event "$camp_dir" "participant-remove" "$participant_id" "" "" "removed"
+                    camp_event_append "$project" "$participant_id" "" "" "removed from camp"
                     info "participant $participant_id removed"
                     ;;
                 *)
