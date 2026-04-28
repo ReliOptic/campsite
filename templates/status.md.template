@@ -13,6 +13,8 @@
 - branch: main
 - base: none
 
+<!-- Fields above are read by campsite CLI -->
+
 ## What Works
 
 - none yet

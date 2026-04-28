@@ -68,7 +68,6 @@ usage:
   campsite validate       Structure + freshness verification
   campsite recover        Clear orphaned locks + stale files
   campsite dashboard      All projects overview
-  campsite camp           Camp state commands and local recovery-first scene
   campsite camp render    Render camp in browser (Phaser storyworld when built, legacy HTML otherwise)
   campsite camp render --legacy   Force legacy HTML renderer
   campsite camp serve     Live camp server with auto-refresh (http://localhost:8470)
@@ -306,6 +305,7 @@ cmd_sync() {
     local sync_device
     sync_device="$(detect_device 2>/dev/null || echo "unknown")"
     history_append "$project" "$sync_adapter_name" "$sync_device" "$(now_iso)" "0" "sync"
+    info "sync complete — run 'campsite' to launch, or 'campsite status' to review"
 }
 
 _checkpoint_commit_message() {
@@ -325,7 +325,7 @@ _save_git_checkpoint_push() {
     local project="$1"
     local repo_root branch
     repo_root="$(_git_repo_root "$project")" || {
-        warn "save --push skipped: project is not inside a git repository"
+        info "save --push skipped: project is not inside a git repository"
         return 0
     }
 
@@ -393,8 +393,20 @@ cmd_save() {
 
     # Store current hash
     hash_store "$project"
+
+    # Truncate Session Log to last 10 entries
+    local hf="$project/handoff.md"
+    if [[ -f "$hf" ]]; then
+        local tmp; tmp="$(mktemp)"
+        awk '
+            /^\| [0-9]/ { rows[++n]=$0; next }
+            { if (n>0) { for(i=(n>10?n-10+1:1);i<=n;i++) print rows[i]; n=0 } print }
+        ' "$hf" > "$tmp" && mv "$tmp" "$hf"
+    fi
+
     printf '\n'
     printf '  \033[32m◎\033[0m  좋아요! 다음에 돌아오면 바로 시작할 수 있어요.\n'
+    printf '     (session saved — context synced for next launch)\n'
 
     # Brief camp state after save
     local next_val=""
@@ -516,13 +528,13 @@ _validate_project() {
     done
 
     # Header checks
-    grep -q "^# Status" "$project/status.md" || fail "invalid status.md header"
-    grep -q "^# Handoff" "$project/handoff.md" || fail "invalid handoff.md header"
+    grep -q "^# Status" "$project/status.md" || fail "invalid status.md header" "First line should be: # Status"
+    grep -q "^# Handoff" "$project/handoff.md" || fail "invalid handoff.md header" "First line should be: # Handoff"
 
     # Phase validation
     local phase
     phase="$(field_value "$project/status.md" "phase")"
-    [[ -n "$phase" ]] || fail "missing status phase"
+    [[ -n "$phase" ]] || fail "missing status phase" "Add '- phase: building' to status.md (valid: starting building reviewing complete blocked)"
     
     local valid_phases="${CAMPSITE_VALID_PHASES:-discovery building testing reviewing blocked deployed}"
     local phase_valid=0
@@ -535,7 +547,7 @@ _validate_project() {
     # Task validation
     local task
     task="$(field_value "$project/handoff.md" "task")"
-    [[ -n "$task" ]] || fail "empty handoff task"
+    [[ -n "$task" ]] || fail "empty handoff task" "Add '- task: your next step' to handoff.md"
 
     # Freshness check
     if [[ "$mode" == "verbose" ]]; then
@@ -559,7 +571,7 @@ cmd_recover() {
     if [[ -z "$workspace" ]]; then
         # Try current project only
         local project
-        project="$(detect_project 2>/dev/null)" || fail "no project or workspace found"
+        project="$(detect_project 2>/dev/null)" || fail "no project or workspace found" "Run 'campsite init' in a project directory, or 'campsite setup' to configure your workspace"
         _recover_project "$project"
         return
     fi
@@ -910,7 +922,7 @@ cmd_camp() {
                 fi
                 return 0
             fi
-            [[ "$action" == "set" ]] || fail "usage: campsite camp mission set <title> [--summary=...] [--state=...] [--next-action=...]"
+            [[ "$action" == "set" ]] || fail "usage: campsite camp mission set <title>" "In interactive mode, run 'campsite camp mission' without arguments for a guided prompt"
 
             local title="${1:-}"
             shift || true
@@ -989,8 +1001,34 @@ cmd_camp() {
                     camp_event_append "$project" "$participant_id" "$old_state" "$fire_state" "${summary:-Updated participant state.}"
                     info "camp participant updated → $participant_id"
                     ;;
+                list)
+                    local camp_dir="$project/.campsite/camp"
+                    local tsv="$camp_dir/participants.tsv"
+                    if [[ ! -f "$tsv" ]]; then
+                        info "(no participants registered)"
+                        return 0
+                    fi
+                    printf '%-20s %-20s %-10s %-10s %s\n' "ID" "Name" "State" "Tool" "Summary"
+                    printf '%-20s %-20s %-10s %-10s %s\n' "----" "----" "-----" "----" "-------"
+                    while IFS=$'\t' read -r id name ptype tool terminal state summary rest; do
+                        printf '%-20s %-20s %-10s %-10s %s\n' "$id" "$name" "$state" "$tool" "$summary"
+                    done < "$tsv"
+                    ;;
+                remove)
+                    local participant_id="${2:-}"
+                    [[ -z "$participant_id" ]] && fail "usage: campsite camp participant remove <id>"
+                    local camp_dir="$project/.campsite/camp"
+                    local tsv="$camp_dir/participants.tsv"
+                    if [[ ! -f "$tsv" ]] || ! grep -q "^$participant_id"$'\t' "$tsv" 2>/dev/null; then
+                        fail "unknown participant: $participant_id" "See current participants with 'campsite camp participant list'"
+                    fi
+                    local tmp; tmp="$(mktemp)"
+                    grep -v "^$participant_id"$'\t' "$tsv" > "$tmp" && mv "$tmp" "$tsv"
+                    camp_log_event "$camp_dir" "participant-remove" "$participant_id" "" "" "removed"
+                    info "participant $participant_id removed"
+                    ;;
                 *)
-                    fail "usage: campsite camp participant <enter|update> ..."
+                    fail "usage: campsite camp participant <enter|update|list|remove> ..."
                     ;;
             esac
             ;;

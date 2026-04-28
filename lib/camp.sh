@@ -359,13 +359,14 @@ camp_overview_lines() {
             for (i = 1; i <= wait_n; i++) {
                 waiting_line = waiting_line (i > 1 ? ", " : "") waiting[i]
             }
-            if (active_line == "") active_line = "none yet"
-            if (waiting_line == "") waiting_line = "none waiting"
+            if (active_line == "") active_line = "(no active sessions — run campsite to start)"
+            if (waiting_line == "") waiting_line = "(nothing needs review)"
             if (next_action == "") next_action = fallback_next_action
             if (next_name == "") next_name = "mission"
             print "ACTIVE\t" active_line
             print "WAITING\t" waiting_line
-            print "NEXT\t" next_name ": " next_action
+            if (next_name == "mission") print "NEXT\t" next_action
+            else print "NEXT\t" next_name ": " next_action
         }
     ' "$participants_file"
 }
@@ -446,8 +447,8 @@ camp_render() {
     done < <(camp_overview_lines "$project_root")
 
     local active_line_html waiting_line_html next_line_html
-    active_line_html="$(printf '%s' "${active_line:-none yet}" | camp_html_escape)"
-    waiting_line_html="$(printf '%s' "${waiting_line:-none waiting}" | camp_html_escape)"
+    active_line_html="$(printf '%s' "${active_line:-(no active sessions — run campsite to start)}" | camp_html_escape)"
+    waiting_line_html="$(printf '%s' "${waiting_line:-(nothing needs review)}" | camp_html_escape)"
     next_line_html="$(printf '%s' "${next_line:-none}" | camp_html_escape)"
 
     # Build participant JSON via awk to avoid bash read empty-field bug
@@ -765,7 +766,7 @@ EOF
     document.getElementById("working-now").textContent = DATA.workingNow;
     document.getElementById("waiting-on-you").textContent = DATA.waitingOnYou;
     document.getElementById("next-move").textContent = DATA.nextMove;
-    document.getElementById("camp-footer").textContent = DATA.participantCount + " participants in camp";
+    document.getElementById("camp-footer").textContent = DATA.participantCount + (DATA.participantCount === 1 ? " participant" : " participants") + " in camp";
 
     const list = document.getElementById("participant-list");
     if (DATA.participants.length === 0) {

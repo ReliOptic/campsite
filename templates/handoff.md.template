@@ -9,11 +9,6 @@
 - entry-point: README.md
 - precondition: project summary must be written
 
-## Fallback Action
-
-- task: alternative if primary task is blocked
-- entry-point: README.md
-
 ## Context for Next Session
 
 Summarize the minimum context the next human or agent needs.

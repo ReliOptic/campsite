@@ -48,9 +48,9 @@ _run_camp() {
     _run_camp overview
 
     [[ "$status" -eq 0 ]]
-    echo "$output" | grep -q "working-now: none yet"
-    echo "$output" | grep -q "waiting-on-you: none waiting"
-    echo "$output" | grep -q "next-move: mission: implement tests"
+    echo "$output" | grep -q "working-now: (no active sessions"
+    echo "$output" | grep -q "waiting-on-you: (nothing needs review)"
+    echo "$output" | grep -q "next-move: implement tests"
 }
 
 @test "camp html uses truthful empty state when no real participants exist" {
