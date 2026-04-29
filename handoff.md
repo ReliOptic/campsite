@@ -2,14 +2,16 @@
 
 ## Next Action
 
-- task: Self-Resource Phase 1 — §8 절대 금지 4항 자체 보정 (design/system/ CSS 수정)
+- task: Self-Resource Phase 4 — lib/camp.sh INTEGRATION Step 1~6 자체 진행
 - priority: high
-- estimated-scope: small
-- entry-point: design/system/surface.css (1px outline·border-radius·blur 검수)
-- precondition: 외부 디자이너 발주 폐기 결정 (M3_REORDER_BRIEF.md는 archive 보존, 송부 안 함). v1.0은 LoFi 시각 정체성으로 자체 출시. PNG 자산 업그레이드는 v1.1 마일스톤으로 이연.
-- next-after: Phase 2 (WCAG 6항 자체 보정) → Phase 3 (시나리오 D F-2 자체 HTML 시안) → Phase 4 (lib/camp.sh INTEGRATION Step 1~6 자체 진행)
-- reference: design/handoff/2026-04-29-claude-design/UX_EVAL_2026-04-29.md (자체 보정의 P0/P1 명세 출처)
-- roadmap: docs/completion-roadmap.md Phase 5 (self-resource 모드로 전환 예정)
+- estimated-scope: large (5~7일)
+- entry-point: lib/camp.sh:506 camp_render() — design/system/ 4 CSS + preview/active-camp.html 구조 채용
+- precondition: Phase 1 (§8 감사) 완료 ✓ / Phase 2+3 (a11y·시나리오 D·768px) 완료 ✓ / design/system/ 권위 자원 안정
+- previous: Phase 1 commit 72746ec / Phase 2 보고서 design/system/PHASE2_REPORT.md
+- next-after: Phase 5 (회귀 테스트 보강 + 페르소나 시험 발동)
+- reference: design/system/preview/active-camp.html (자체 시안 단일 진실원)
+- roadmap: docs/completion-roadmap.md Phase 5 (self-resource 모드 진행 중)
+- preview: bash design/system/preview/start-preview.sh (포트 4292)
 
 ## Context for Next Session
 

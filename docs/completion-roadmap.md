@@ -191,10 +191,10 @@ P0 차단 사유 5항 요약:
 
 | Phase | 내용 | 상태 |
 |---|---|---|
-| Phase 1 | §8 4항 자체 감사 | 완료 (extraction 시점에 자동 처리) |
-| Phase 2 | a11y 6항 + Canyon 콘트라스트 자체 보정 | 진행 중 (Canyon 토큰 4.5:1 통과) |
-| Phase 3 | 시나리오 D F-2 자체 HTML 시안 + 768px 폴백 | 예정 |
-| Phase 4 | lib/camp.sh INTEGRATION Step 1~6 자체 진행 | 예정 |
+| Phase 1 | §8 4항 자체 감사 | 완료 (extraction 시점에 자동 처리) — `design/system/PHASE1_AUDIT.md` |
+| Phase 2 | a11y 6항 + Canyon 콘트라스트 + 시나리오 D 자체 시안 + 768px 폴백 (Phase 3 통합) | 완료 — `design/system/PHASE2_REPORT.md`, 자체 시안 32 KB, a11y 가드 56건 |
+| Phase 3 | (Phase 2에 통합됨) | — |
+| Phase 4 | lib/camp.sh INTEGRATION Step 1~6 자체 진행 | 다음 |
 | Phase 5 | 회귀 테스트 보강 + 페르소나 시험 발동 | 예정 |
 
 **M3 라운드 산출물 명세 (UX_EVAL §6.2)**:
