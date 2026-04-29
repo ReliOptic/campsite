@@ -183,7 +183,19 @@ P0 차단 사유 5항 요약:
 4. WCAG 2.2 AA 6항 미준수 (키보드·포커스·이름·색상비의존·콘트라스트·alt-text)
 5. 외부 의존 위험 (React/Babel CDN, Google Fonts CDN, `text/babel` production 부적합)
 
-**M3 재발주 필요 — 임베드는 M3 산출물 수령 후**.
+**~~M3 재발주 필요 — 임베드는 M3 산출물 수령 후~~** (폐기, 2026-04-29).
+
+**Self-Resource 모드 전환 (2026-04-29)**: 외부 디자이너 의존 폐기. v1.0은 LoFi 시각 정체성(`design/system/` 4개 권위 CSS + SVG `data:` URI 동물 sprite)으로 자체 출시. HD 픽셀 아트 PNG 자산 업그레이드는 v1.1 마일스톤으로 이연. M3 발주서는 archive 보존(`design/handoff/2026-04-29-claude-design/M3_REORDER_BRIEF.md`).
+
+자체 처리 5 Phase (`design/system/PHASE1_AUDIT.md §5`):
+
+| Phase | 내용 | 상태 |
+|---|---|---|
+| Phase 1 | §8 4항 자체 감사 | 완료 (extraction 시점에 자동 처리) |
+| Phase 2 | a11y 6항 + Canyon 콘트라스트 자체 보정 | 진행 중 (Canyon 토큰 4.5:1 통과) |
+| Phase 3 | 시나리오 D F-2 자체 HTML 시안 + 768px 폴백 | 예정 |
+| Phase 4 | lib/camp.sh INTEGRATION Step 1~6 자체 진행 | 예정 |
+| Phase 5 | 회귀 테스트 보강 + 페르소나 시험 발동 | 예정 |
 
 **M3 라운드 산출물 명세 (UX_EVAL §6.2)**:
 

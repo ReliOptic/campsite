@@ -84,8 +84,8 @@
   --secondary: #9c5a3a;
   --tertiary: #c83c2a;       /* canyon red CTA */
   --on-surface: #2c1d12;
-  --on-surface-dim: #6e5236;
-  --on-surface-faint: #9a826b;  /* ⚠ 콘트라스트 미달 — 재조정 필요 */
+  --on-surface-dim: #5a4226;       /* WCAG AA 통과 (4.7:1 on surface-low) */
+  --on-surface-faint: #5e4828;     /* WCAG AA 통과 (4.5:1 on surface-low) — Phase 2 자체 보정 (was #9a826b 2.6:1) */
   --outline: rgba(70, 42, 24, 0.3);
   --outline-faint: rgba(70, 42, 24, 0.14);
 

@@ -2,14 +2,14 @@
 
 ## Next Action
 
-- task: M3 라운드 디자이너 회신 발주서 송부 + P0 5항 해소 산출물 수령
+- task: Self-Resource Phase 1 — §8 절대 금지 4항 자체 보정 (design/system/ CSS 수정)
 - priority: high
-- estimated-scope: medium (1~3주)
-- entry-point: design/handoff/2026-04-29-claude-design/M3_REORDER_BRIEF.md
-- precondition: UX_EVAL §3 P0 5항 합의 완료
-- blocker: 본체 임베드(INTEGRATION.md §5.2 Step 1~6)는 M3 산출물 수령 전 진행 금지
-- reference: design/handoff/2026-04-29-claude-design/UX_EVAL_2026-04-29.md (4인 자문팀 평가 종합 보고서)
-- roadmap: docs/completion-roadmap.md Phase 5 (1차분 평가 후 보류 상태)
+- estimated-scope: small
+- entry-point: design/system/surface.css (1px outline·border-radius·blur 검수)
+- precondition: 외부 디자이너 발주 폐기 결정 (M3_REORDER_BRIEF.md는 archive 보존, 송부 안 함). v1.0은 LoFi 시각 정체성으로 자체 출시. PNG 자산 업그레이드는 v1.1 마일스톤으로 이연.
+- next-after: Phase 2 (WCAG 6항 자체 보정) → Phase 3 (시나리오 D F-2 자체 HTML 시안) → Phase 4 (lib/camp.sh INTEGRATION Step 1~6 자체 진행)
+- reference: design/handoff/2026-04-29-claude-design/UX_EVAL_2026-04-29.md (자체 보정의 P0/P1 명세 출처)
+- roadmap: docs/completion-roadmap.md Phase 5 (self-resource 모드로 전환 예정)
 
 ## Context for Next Session
 

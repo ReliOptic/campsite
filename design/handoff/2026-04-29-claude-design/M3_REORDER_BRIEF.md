@@ -1,10 +1,17 @@
 # M3 (1차 재발주) 디자이너 회신 발주서 — Campsite Visual Identity
 
+> ## ⚠ 본 발주서는 Archive 보존 — **송부하지 않음** (2026-04-29 결정)
+>
+> 외부 디자이너 의존 폐기. v1.0은 self-resource 모드로 진행하며, PNG 자산 업그레이드는 v1.1 마일스톤으로 이연. 본 문서는 외부 발주 가능성이 재개될 경우 활용 가능한 형태로 보존됨.
+>
+> 자체 진행 절차: `design/system/PHASE1_AUDIT.md` 참조. UX_EVAL P0 5항 + P1 5항의 자체 처리 방안과 Phase 1~5 일정이 명세되어 있음.
+
 > 발주처: ReliOptic / Kiwon Cho (ckiwon7@gmail.com)
 > 회신 대상: 1차 라운드 외주 인원 또는 스튜디오 (1차와 동일)
 > 발주 일자: 2026-04-29
 > 라운드 명칭: M3 (1차 재발주) — `UX_EVAL_2026-04-29.md` §6.2 명명 차용
 > 선행 자료: `design/design-brief.md` v1.0 + `design/handoff/2026-04-29-claude-design/UX_EVAL_2026-04-29.md`
+> 위상: Archive (송부하지 않음)
 
 ---
 

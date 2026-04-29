@@ -1,13 +1,21 @@
 # Campsite 제품 디자인 발주서 (Design Brief)
 
+> ## ⚠ Self-Resource 모드 (2026-04-29 전환)
+>
+> 본 발주서는 외부 디자이너 의존을 폐기하고 **self-resource 모드**로 전환되었다. v1.0은 LoFi 시각 정체성으로 자체 출시하며, HD 픽셀 아트 PNG 자산(카테고리 A·B·C) 업그레이드는 v1.1 마일스톤으로 이연한다.
+>
+> 본 문서의 §6 산출물 명세 8개 카테고리 중 v1.0 채택 범위는 `design/system/PHASE1_AUDIT.md §4`에 재정의되어 있다. M3 외부 재발주(`M3_REORDER_BRIEF.md`)는 archive 보존되며 송부되지 않는다.
+>
+> 자체 처리 일정(Phase 1~5)은 `design/system/PHASE1_AUDIT.md §5` 참조.
+
 > 발주처: ReliOptic / Kiwon Cho (ckiwon7@gmail.com)
 > 프로젝트: Campsite — Recovery-First AI Workspace
-> 문서 버전: v1.0
+> 문서 버전: v1.0 (self-resource 모드 추가, 2026-04-29)
 > 작성일: 2026-04-29
 > 회수 의뢰처: GitHub https://github.com/ReliOptic/campsite
 > 발주 범위: 제품 시각 정체성(Visual Identity), 픽셀 아트 자산군, Camp View 화면 디자인, Family-Look 가이드 정합
 
-본 문서는 외부 디자인 전문가(또는 스튜디오)에게 Campsite 제품 디자인 일체를 의뢰하기 위한 단일 참조서이다. 본 문서로 견적 산정·작업 착수·산출물 검수가 가능하도록 자기 완결적으로 작성되었다.
+본 문서는 본래 외부 디자인 전문가에게 의뢰하기 위한 단일 참조서로 작성되었으나, 2026-04-29부로 self-resource 모드로 전환되어 v1.0 범위는 자체 자원으로 충족한다. 외부 발주 항목 명세(§6 등)는 v1.1 이후 외부 발주 재개 시 재활용 가능하도록 보존된다.
 
 ---
 

@@ -11,6 +11,10 @@
 >
 > 본 문서의 §3 자기 검증 결과(특히 §3.3 "10항 중 9항 준수" 자평)는 **권위 자료로 사용 금지**. UX_EVAL §3.3에서 §8 절대 금지 4항 위반이 추가 식별되어 자기 검증 신뢰도가 결정적으로 손상되었음. 본체 임베드 진행 전 반드시 UX_EVAL 권고를 우선 참조한다.
 
+> ## ⚠ Self-Resource 모드 전환 (2026-04-29)
+>
+> 외부 디자이너 의존 폐기. M3 외부 재발주(`M3_REORDER_BRIEF.md`)는 송부하지 않고 archive 보존. **§5.2 Step 1~6 본체 임베드는 self-resource 모드로 자체 진행**한다. 자체 진행 절차와 Phase 1~5 일정은 `design/system/PHASE1_AUDIT.md` 참조. v1.0은 LoFi 시각 정체성(`design/system/` 4개 권위 CSS)으로 출시, HD PNG 자산은 v1.1로 이연.
+
 본 문서는 외부 디자인 도구가 산출한 시각 시안을 Campsite 본체(lib/camp.sh의 `camp_render`, `camp-client/`)로 옮겨 적용하는 단계별 절차를 명세한다.
 
 ---
