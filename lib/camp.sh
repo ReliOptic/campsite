@@ -1053,6 +1053,62 @@ HTMLEOF
 }
 
 # ---------------------------------------------------------------------------
+# camp_design_system_dir — locate the self-resource design/system/ directory.
+#
+# Search order:
+#   1. CAMPSITE_ROOT/design/system  — git-clone dev path set by bin/campsite
+#   2. $HOME/.campsite/design/system — default installed location
+#   3. CAMPSITE_HOME/design/system  — custom install path
+#
+# Prints the path and returns 0 when found; prints nothing and returns 1 if
+# the design system is unavailable. The caller should fall back to the legacy
+# camp_render() in that case.
+# ---------------------------------------------------------------------------
+camp_design_system_dir() {
+    [[ -n "${CAMPSITE_DISABLE_DESIGN_SYSTEM:-}" ]] && return 1
+    local candidate
+    if [[ -n "${CAMPSITE_ROOT:-}" && -d "$CAMPSITE_ROOT/design/system" ]]; then
+        printf '%s' "$CAMPSITE_ROOT/design/system"
+        return 0
+    fi
+    candidate="$HOME/.campsite/design/system"
+    if [[ -d "$candidate" ]]; then
+        printf '%s' "$candidate"
+        return 0
+    fi
+    if [[ -n "${CAMPSITE_HOME:-}" && -d "$CAMPSITE_HOME/design/system" ]]; then
+        printf '%s' "$CAMPSITE_HOME/design/system"
+        return 0
+    fi
+    return 1
+}
+
+# ---------------------------------------------------------------------------
+# camp_render_v2 — Phase 4 self-resource renderer.
+#
+# Status: stub (Phase 4a). Currently delegates to camp_render() (legacy) so
+# the dispatcher chain is testable without regressions. Phase 4b will replace
+# the body with design/system/ inline CSS + 5-region IA layout + a11y guards.
+#
+# Acceptance for stub: same output as camp_render(). Acceptance for Phase 4b:
+# emits new visual system with design/system/{tokens,motion,fire-states,
+# surface}.css inlined and structurally matches design/system/preview/
+# active-camp.html.
+# ---------------------------------------------------------------------------
+camp_render_v2() {
+    local project_root="$1"
+    local design_dir
+    if ! design_dir="$(camp_design_system_dir)"; then
+        # No design/system/ available — fall back to legacy verbatim
+        camp_render "$project_root"
+        return $?
+    fi
+    # Phase 4a stub: design/system/ exists but v2 body not yet implemented.
+    # Delegating to legacy preserves zero regression while Phase 4b lands.
+    camp_render "$project_root"
+}
+
+# ---------------------------------------------------------------------------
 # camp_phaser_dist_dir — locate the Phaser build output directory.
 #
 # Search order:

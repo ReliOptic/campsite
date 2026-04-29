@@ -770,14 +770,19 @@ cmd_camp() {
             done
 
             local html_path
-            # Use Phaser renderer when dist exists and --legacy not requested.
+            # Render dispatcher chain (priority order, --legacy disables 1+2):
+            #   1. Phaser dist available + not --legacy  → camp_render_phaser
+            #   2. design/system/ available + not --legacy → camp_render_v2 (Phase 4)
+            #   3. fallback or --legacy                  → camp_render (legacy)
             local _phaser_dist
             _phaser_dist="$(camp_phaser_dist_dir 2>/dev/null)" || _phaser_dist=""
             if [[ $legacy -eq 0 && -n "$_phaser_dist" ]]; then
                 if ! html_path="$(camp_render_phaser "$project" 2>&1)"; then
-                    warn "Phaser render failed — falling back to legacy renderer"
-                    html_path="$(camp_render "$project")"
+                    warn "Phaser render failed — falling back to design-system renderer"
+                    html_path="$(camp_render_v2 "$project")"
                 fi
+            elif [[ $legacy -eq 0 ]] && camp_design_system_dir >/dev/null 2>&1; then
+                html_path="$(camp_render_v2 "$project")"
             else
                 html_path="$(camp_render "$project")"
             fi
@@ -828,8 +833,14 @@ cmd_camp() {
             fi
 
             if [[ $legacy -eq 1 || -z "${serve_dir:-}" ]]; then
-                # Legacy path
-                camp_render "$project" >/dev/null
+                # Render dispatcher chain — same priority as `camp render`:
+                #   1. design/system/ available + not --legacy → camp_render_v2
+                #   2. fallback or --legacy                    → camp_render
+                if [[ $legacy -eq 0 ]] && camp_design_system_dir >/dev/null 2>&1; then
+                    camp_render_v2 "$project" >/dev/null
+                else
+                    camp_render "$project" >/dev/null
+                fi
 
                 # Copy exported design assets if available
                 if camp_assets_install "$project" 2>/dev/null; then
@@ -1148,13 +1159,19 @@ cmd_camp() {
             done
 
             local html_path
+            # Render dispatcher chain (same priority as `camp render`):
+            #   1. Phaser dist available + not --legacy   → camp_render_phaser
+            #   2. design/system/ available + not --legacy → camp_render_v2
+            #   3. fallback or --legacy                   → camp_render (legacy)
             local _phaser_dist_fb
             _phaser_dist_fb="$(camp_phaser_dist_dir 2>/dev/null)" || _phaser_dist_fb=""
             if [[ $legacy -eq 0 && -n "$_phaser_dist_fb" ]]; then
                 if ! html_path="$(camp_render_phaser "$project" 2>&1)"; then
-                    warn "Phaser render failed — falling back to legacy renderer"
-                    html_path="$(camp_render "$project")"
+                    warn "Phaser render failed — falling back to design-system renderer"
+                    html_path="$(camp_render_v2 "$project")"
                 fi
+            elif [[ $legacy -eq 0 ]] && camp_design_system_dir >/dev/null 2>&1; then
+                html_path="$(camp_render_v2 "$project")"
             else
                 html_path="$(camp_render "$project")"
             fi
