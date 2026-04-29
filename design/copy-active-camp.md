@@ -266,12 +266,132 @@
 | 미션 | `사용자 스키마 0042 마이그레이션 적용` | `Apply user schema migration 0042` |
 | 다음 행동 | `스테이징 백필 검증 후 운영 적용 결정` | `verify staging backfill, then decide on prod cutover` |
 
-### 11.3 시나리오 D — 사이드 프로젝트(희원 페르소나)
+### 11.3 시나리오 D — 사이드 프로젝트(희원 페르소나, 정식 영웅 변형)
+
+본 시나리오는 1차 핸드오프 `payments-v1` 시나리오를 대체하는 **정식 F-2 영웅 시안**이다. 페르소나 희원(32세, 프론트엔드 개발자, 비코더 친화)의 퇴근 후 30분 사이드 프로젝트 시점을 표현한다. 분위기는 캐주얼·낮은 인지부하·"어렵지 않다" 정서이며, 코더 어휘(authentication flow·session management·OAuth·JWT·middleware)는 회피하고 비코더 친화 영어 어휘(login page·email verification·Vercel deploy)만 채택한다.
+
+#### 11.3.1 시나리오 가정
+
+| 항목 | 한국어 | English |
+|---|---|---|
+| 프로젝트 | `로그인 페이지 (사이드)` | `login page (side)` |
+| 미션 | `로그인 페이지 만들기` | `Build the login page` |
+| 참여자 수 | `1명 sparse 또는 2명` | `1 sparse or 2` |
+| 미해결 메시지 | `0건 또는 1건 (가벼운 환경 변수 질문)` | `0 or 1 (light env var question)` |
+| 마지막 진입 | `23분 전` | `23m ago` |
+
+#### 11.3.2 Top Status Bar
 
 | 영역 | 한국어 | English |
 |---|---|---|
-| 미션 | `로그인 페이지 만들기` | `Build the login page` |
-| 다음 행동 | `이메일 검증 흐름 마무리 후 Vercel 배포` | `finish email verification, then deploy to Vercel` |
+| 프로젝트 라벨 | `login-page` | `login-page` |
+| 미션 라벨 | `미션 · 로그인 페이지 만들기` | `Mission · Build the login page` |
+| 동기화 신선도 | `2분 전 동기화` | `synced 2m ago` |
+| 활성 인원 | `활동 중 1` (1명) / `활동 중 2` (2명) | `1 working now` / `2 working now` |
+| 차단 수 | `차단 0` (기본) / `차단 1` (yeongi 1건일 때) | `0 blocked` / `1 blocked` |
+| 검토 대기 | `검토 대기 0` | `0 to review` |
+
+#### 11.3.3 Left Terminal Rail (M3 시안 통합 후 4행)
+
+P1-1 권고 반영. LOCAL 섹션 첫 진입 시 4행만 노출, 나머지는 펼치기 토글.
+
+| 영역 | 한국어 | English |
+|---|---|---|
+| 섹션 헤더 | `LOCAL` | `LOCAL` |
+| 상태 | `상태 · building` | `status · building` |
+| 브랜치 | `브랜치 · feat/login-page` | `branch · feat/login-page` |
+| 최근 진입 | `최근 진입 · 23분 전` | `last seen · 23m ago` |
+| 신선도 | `신선도 · 양호` | `freshness · healthy` |
+
+펼치기 토글 시 추가 노출 항목: 호스트·어댑터·잠금 (§11.1·§11.2 패턴 cross-reference).
+
+#### 11.3.4 Mission Card
+
+| 영역 | 한국어 | English |
+|---|---|---|
+| 미션 제목 | `로그인 페이지 만들기` | `Build the login page` |
+| 미션 요약 | `이메일 + 비밀번호 로그인 흐름을 만들고 Vercel에 배포한다.` | `Build the email + password login flow and deploy to Vercel.` |
+| 미션 단계 | `단계 · building` | `phase · building` |
+| 시작 시각 | `시작 · 4월 28일 19:30` | `started · Apr 28, 19:30` |
+| 미션 상태 | `모닥불 (modakbul) · 활발하게 진행 중` | `modakbul · in active progress` |
+| 다음 행동 | `다음 행동 · 이메일 검증 흐름 마무리 후 Vercel 배포` | `next move · finish email verification, then deploy to Vercel` |
+| 메타 라벨 (1명) | `참여자 1 · 이벤트 4건 · 미해결 메시지 0` | `1 participant · 4 events · 0 unresolved` |
+| 메타 라벨 (2명) | `참여자 2 · 이벤트 6건 · 미해결 메시지 0` | `2 participants · 6 events · 0 unresolved` |
+
+#### 11.3.5 Return Panel 3블록
+
+##### Working now (활동 중)
+
+| 줄 | 한국어 | English |
+|---|---|---|
+| 헤더 | `활동 중` | `Working now` |
+| 라인 1 | `Claude · 이메일 검증 폼 만드는 중` | `Claude · building the email verification form` |
+| 라인 2 (2명 케이스만) | `Codex · 비밀번호 강도 측정 추가` | `Codex · adding password strength check` |
+
+##### Waiting on you (당신을 기다림)
+
+**0건 케이스 (yeongi 0건)**: §9.3 빈 상태 카피 인용 — `검토할 것이 없어요. 잠시 쉬어도 좋아요.` / `Nothing to review. Take a breath.`
+
+**1건 케이스 (yeongi 1건)**:
+
+| 줄 | 한국어 | English |
+|---|---|---|
+| 헤더 | `당신을 기다림` | `Waiting on you` |
+| 라인 1 (연기) | `Claude · API 키를 까먹은 것 같아요. 한번 봐주세요.` | `Claude · looks like the API key got missed. Take a look?` |
+
+##### Next move (다음 행동)
+
+| 줄 | 한국어 | English |
+|---|---|---|
+| 헤더 | `다음 행동` | `Next move` |
+| 본문 | `이메일 검증 마무리 → 비밀번호 강도 추가 → Vercel 배포` | `Finish email verification → add password strength → deploy to Vercel` |
+| 보조 | `예상 소요 · 약 18분` | `estimated · ~18 minutes` |
+
+#### 11.3.6 참여자 카드
+
+##### 1명 케이스 — Claude (여우, 모닥불)
+
+| 영역 | 한국어 | English |
+|---|---|---|
+| 이름·도구 | `Claude · 여우` | `Claude · the fox` |
+| 상태 | `모닥불 (modakbul)` | `modakbul · active` |
+| 요약 | `이메일 검증 폼 + 입력 검증 메시지 작업 중` | `working on the email verification form + inline validation` |
+| 다음 행동 | `폼 완성 후 비밀번호 입력 단계로 넘어가기` | `finish the form, then move to password input` |
+| 메타 | `Ghostty 터미널 · 21분 활동 중` | `Ghostty · 21m active` |
+
+##### 2명 케이스 — Claude (여우) + Codex (올빼미, 모닥불)
+
+| 영역 | 한국어 | English |
+|---|---|---|
+| 이름·도구 | `Codex · 올빼미` | `Codex · the owl` |
+| 상태 | `모닥불 (modakbul)` | `modakbul · active` |
+| 요약 | `비밀번호 강도 측정 컴포넌트 만드는 중` | `building the password strength meter component` |
+| 다음 행동 | `Claude의 폼 완성 기다린 다음 연결` | `wait for Claude's form, then wire it up` |
+| 메타 | `tmux:1 · 12분 활동 중` | `tmux:1 · 12m active` |
+
+#### 11.3.7 Activity Strip — 최근 5건
+
+시간 역순. 가벼운 분위기 — modakbul 진척 3건 + 환경설정·commit 2건.
+
+| 시각 | 한국어 | English |
+|---|---|---|
+| 19:53 | `Claude → 모닥불 · 이메일 검증 폼 첫 시안 완성` | `Claude → modakbul · email form first draft ready` |
+| 19:48 | `Codex → 모닥불 · 비밀번호 강도 측정 컴포넌트 시작` | `Codex → modakbul · started password strength meter` |
+| 19:40 | `사용자 · .env에 NEXT_PUBLIC_APP_URL 추가` | `you · added NEXT_PUBLIC_APP_URL to .env` |
+| 19:35 | `Claude → 모닥불 · 라우팅 구조 정리 commit` | `Claude → modakbul · committed route restructure` |
+| 19:30 | `미션 시작 · 로그인 페이지 만들기` | `mission started · build the login page` |
+
+#### 11.3.8 토스트·빈 상태 카피 (시나리오 D delta)
+
+§9.2·§9.3 패턴 답습. 시나리오 D 분위기 변형분만 별도 명시.
+
+| 트리거 | 한국어 | English |
+|---|---|---|
+| 신규 미션 점화 | `첫 모닥불을 피웠어요. 좋은 시작이에요.` | `Lit your first campfire. Good start.` |
+| Vercel 배포 시작 | `배포가 시작됐어요. 잠시만 기다려보세요.` | `Deploy started. Hang on a moment.` |
+| 세션 종료 (save) | `다시 돌아오면 바로 시작할 수 있어요.` | `You can pick up right where you left off.` |
+| 가벼운 차단(yeongi) 발생 | `Claude가 환경 변수를 한번 봐달래요.` | `Claude is asking you to check an env var.` |
+| 빈 상태 (Working now 0) | `지금은 잠깐 쉬는 중이에요.` | `Things are quiet right now.` |
 
 ---
 

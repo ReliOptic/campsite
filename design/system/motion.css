@@ -1,0 +1,96 @@
+/* ============================================================
+   Campsite — Motion Specification (AUTHORITATIVE COPY)
+   Source: design/handoff/2026-04-29-claude-design/project/styles/{pixel-art,scene}.css
+   Status: 채택 (UX_EVAL §5 "모션 사양 정합" 8/10, 발주서 §5.7 범위 부합)
+   License: CC BY 4.0 (발주서 §13.2)
+
+   추출 keyframes (총 7종):
+     - flicker        (pixel-art.css:109-114)
+     - spark-rise     (pixel-art.css:115-120) ⚠ P2-5 곡선 보정 권고
+     - pulse-soft     (pixel-art.css:172-175)
+     - smoke-drift    (pixel-art.css:176-179)
+     - aurora-drift   (scene.css:224-227)
+     - twinkle        (scene.css:244-247)
+     - pip-pulse      (scene.css:170-173)
+
+   ⚠ 본 파일에는 keyframes 와 정합성 주석만 포함된다.
+   keyframes 를 참조하는 셀렉터(.campfire .flame, .stars .star.tw 등)는
+   surface.css / fire-states.css 또는 핸드오프 본체 시안을 따른다.
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   flicker — 모닥불 본체 떨림
+   주기: 2.1s · 곡선: ease-in-out · 정합: 발주서 §5.7 "1.7~2.4s 범위 부합"
+   ------------------------------------------------------------ */
+@keyframes flicker {
+  0%, 100% { transform: translateX(-50%) scaleY(1) scaleX(1); opacity: 1; }
+  25% { transform: translateX(-50%) scaleY(1.05) scaleX(0.96); opacity: 0.92; }
+  50% { transform: translateX(-50%) scaleY(0.96) scaleX(1.04); opacity: 1; }
+  75% { transform: translateX(-50%) scaleY(1.03) scaleX(0.98); opacity: 0.95; }
+}
+
+/* ------------------------------------------------------------
+   spark-rise — 불씨 상승 궤적
+   주기: 3.2s · 곡선: linear · 정합: 발주서 §5.7 범위 부합 (3~4s)
+   ⚠ UX_EVAL §3.5 P2-5 인용:
+   "linear 는 자연 부력 가속도 표현 부적합. cubic-bezier(0.4, 0, 0.2, 1)
+    또는 ease-out 권장. 본체 통합 시 곡선 재고."
+   ------------------------------------------------------------ */
+@keyframes spark-rise {
+  0% { transform: translate(0, 0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 0.6; }
+  100% { transform: translate(-12px, -56px); opacity: 0; }
+}
+
+/* ------------------------------------------------------------
+   pulse-soft — 등불 정적 박동 / 참여자 glow
+   주기: 3s · 곡선: ease-in-out · 정합: 발주서 §5.7 "3s 등불 박동" 일치
+   ------------------------------------------------------------ */
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  50% { opacity: 0.85; transform: translate(-50%, 0) scale(1.04); }
+}
+
+/* ------------------------------------------------------------
+   smoke-drift — 연기 부유 흐름
+   주기: 4s · 곡선: ease-in-out · 정합: 발주서 §5.7 "느린 부유 4s" 부합
+   ⚠ 본 keyframe 자체는 픽셀 그리드 위반 없음.
+     단, 이 keyframe 을 참조하는 .fire-mini[data-state="yeongi"] .core 의
+     clip-path 다각형은 fire-states.css 에서 별도 검토.
+   ------------------------------------------------------------ */
+@keyframes smoke-drift {
+  0%, 100% { transform: translate(-50%, 0) skewX(0deg); opacity: 0.85; }
+  50% { transform: translate(-50%, -2px) skewX(3deg); opacity: 1; }
+}
+
+/* ------------------------------------------------------------
+   aurora-drift — 오로라 리본 횡류
+   주기: 18s / 24s / 30s 다중 인스턴스 · 곡선: ease-in-out
+   정합: 발주서 §5.7 "장주기 환경 모션 (>=15s)" 부합
+   ⚠ 핸드오프 원본의 `.aurora .ribbon { filter: blur(28px) }` 는
+     §8-5 "픽셀 그리드 위반·블러 금지" 위반 (UX_EVAL §3.3) — 제외됨.
+     keyframe 만 채택.
+   ------------------------------------------------------------ */
+@keyframes aurora-drift {
+  0%, 100% { transform: translateX(0) skewY(-2deg); }
+  50% { transform: translateX(-6%) skewY(2deg); }
+}
+
+/* ------------------------------------------------------------
+   twinkle — 별 점멸
+   주기: 4s · 곡선: ease-in-out · 정합: 발주서 §5.7 "4s 별 점멸" 일치
+   ------------------------------------------------------------ */
+@keyframes twinkle {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 0.3; }
+}
+
+/* ------------------------------------------------------------
+   pip-pulse — state-pip 모닥불 활성 표현
+   주기: 3s · 곡선: ease-in-out · 정합: 발주서 §5.7 "참여자 활성 박동" 일치
+   ------------------------------------------------------------ */
+@keyframes pip-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}

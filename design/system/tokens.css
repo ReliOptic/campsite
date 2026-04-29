@@ -1,0 +1,208 @@
+/* ============================================================
+   Campsite — Nocturnal Interface tokens (AUTHORITATIVE COPY)
+   Source: design/handoff/2026-04-29-claude-design/project/styles/tokens.css
+   Status: 채택 (UX_EVAL §5 "CSS 토큰 구조" 7/10, "환경 테마별 색채 보존" 8/10)
+   License: CC BY 4.0 (발주서 §13.2)
+
+   ⚠ 검토 사항 — Background `#0e0e14` 무단 변경
+   발주서 §5.1 의 권위 Background 명세를 핸드오프가 임의로 `#0e0e14` 로
+   동결하였다. 본체 통합 시 §5.1 원본 명세와 대조 후 재확인 필요.
+   ============================================================ */
+
+:root {
+  /* === Surface Hierarchy (Aurora Dark — default) === */
+  --bg: #0e0e14;            /* ⚠ 발주서 §5.1 무단 변경 검토 사항 */
+  --surface: #131318;
+  --surface-low: #1b1b20;
+  --surface-high: #2a292f;
+  --surface-highest: #35343a;
+
+  /* === Semantic === */
+  --primary: #cdc1e0;       /* Moonlight Lavender */
+  --secondary: #bac8dc;     /* Moonlight Blue */
+  --tertiary: #00dce5;      /* Neon Cyan */
+  --on-surface: #e4e1e9;
+  --on-surface-dim: #a8a4b4;
+  --on-surface-faint: #6c6877;
+  --outline: rgba(73, 69, 78, 0.45);
+  --outline-faint: rgba(73, 69, 78, 0.22);
+
+  /* === Fire-state Semantics ===
+     UX_EVAL §5 "화로 5종 의미 색채 분화" 8/10 — 색상환상 명확 분리, 채택. */
+  --bulssi:    #c97a3a;  /* 불씨 — weak ember orange */
+  --modakbul:  #ff8a3d;  /* 모닥불 — strong ember + warm glow */
+  --modakbul-glow: rgba(255, 138, 61, 0.35);
+  --deungbul:  #f3c969;  /* 등불 — lantern gold */
+  --yeongi:    #6f8aa8;  /* 연기 — smoke blue-gray */
+  --yeongi-edge: #4be0ff;
+  --jangjak:   #8ac39a;  /* 장작 — ready green (restrained) */
+
+  /* === Aurora === */
+  --aurora-1: #4be0ff;
+  --aurora-2: #5af5b3;
+  --aurora-3: #b07cff;
+  --aurora-4: #2d6f8f;
+
+  /* === Sky === */
+  --sky-deep: #0a0d18;
+  --sky-mid: #131830;
+  --sky-near: #1f2238;
+  --moon: #f0e6d2;
+
+  /* === Spacing scale (compressed terminal × spacious camp) === */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+  --s-9: 96px;
+
+  /* === Type === */
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  --font-kr: "Pretendard", "Noto Sans KR", system-ui, sans-serif;
+}
+
+/* ============================================================
+   Theme: Canyon Daylight — sun-warmed sandstone
+   ⚠ UX_EVAL §4.4 P1-4: `--on-surface-faint #9a826b` on
+   `--surface-low #d6c0a3` ≈ 2.6:1 (WCAG 1.4.3 AA 미달).
+   본체 통합 시 휘도 재조정 필수.
+   ============================================================ */
+[data-theme="canyon"] {
+  --bg: #d6c0a3;
+  --surface: #e6d4b8;
+  --surface-low: #d6c0a3;
+  --surface-high: #ecdcc2;
+  --surface-highest: #f3e6d0;
+
+  --primary: #6b3f2a;
+  --secondary: #9c5a3a;
+  --tertiary: #c83c2a;       /* canyon red CTA */
+  --on-surface: #2c1d12;
+  --on-surface-dim: #6e5236;
+  --on-surface-faint: #9a826b;  /* ⚠ 콘트라스트 미달 — 재조정 필요 */
+  --outline: rgba(70, 42, 24, 0.3);
+  --outline-faint: rgba(70, 42, 24, 0.14);
+
+  --aurora-1: #f6c98e;
+  --aurora-2: #e8a26a;
+  --aurora-3: #c25a3d;
+  --aurora-4: #8d4b2e;
+
+  --sky-deep: #b9d3e0;
+  --sky-mid: #d2deea;
+  --sky-near: #e3d5be;
+  --moon: #fff4d8;
+}
+
+/* ============================================================
+   Theme: Granite & Pine — muted stone, deep evergreen
+   ============================================================ */
+[data-theme="granite"] {
+  --bg: #11161a;
+  --surface: #18202a;
+  --surface-low: #1f2832;
+  --surface-high: #2a3641;
+  --surface-highest: #354451;
+
+  --primary: #b9c7d2;
+  --secondary: #93a8b6;
+  --tertiary: #5fc0a6;       /* pine green spark */
+  --on-surface: #d8dde2;
+  --on-surface-dim: #8a99a6;
+  --on-surface-faint: #57646e;
+
+  --aurora-1: #5fa994;
+  --aurora-2: #3d6e6a;
+  --aurora-3: #6e8294;
+  --aurora-4: #2f4350;
+
+  --sky-deep: #0d1318;
+  --sky-mid: #182229;
+  --sky-near: #20303a;
+  --moon: #e0e6ec;
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--on-surface);
+  font-family: var(--font-body);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Reduced motion: kill all animations as the brief demands */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+[data-lofi="off"] *, [data-lofi="off"] *::before, [data-lofi="off"] *::after {
+  animation: none !important;
+}
+
+/* === Type utility classes === */
+.t-display {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+}
+.t-headline {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+.t-body {
+  font-family: var(--font-body);
+  font-weight: 400;
+  line-height: 1.5;
+}
+.t-label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 500;
+  color: var(--on-surface-dim);
+}
+.t-mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+.t-kr-meta {
+  font-family: var(--font-kr);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+/* === Corner accents (4×4 tertiary) === */
+.corner-accents { position: relative; }
+.corner-accents::before,
+.corner-accents::after,
+.corner-accents > .ca-tl,
+.corner-accents > .ca-br {
+  content: "";
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: var(--tertiary);
+  pointer-events: none;
+}
+.corner-accents::before { top: 0; left: 0; }            /* top-left */
+.corner-accents::after  { top: 0; right: 0; }           /* top-right */
+.corner-accents > .ca-bl { left: 0; bottom: 0; position: absolute; width: 4px; height: 4px; background: var(--tertiary); }
+.corner-accents > .ca-br { right: 0; bottom: 0; }

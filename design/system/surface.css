@@ -1,0 +1,234 @@
+/* ============================================================
+   Campsite — Surface Hierarchy & Family-Look Vocabulary
+   Source: design/handoff/2026-04-29-claude-design/project/styles/scene.css
+   Status: 채택 (UX_EVAL §5 "5영역 IA 골격"·"복귀 우선순위 시각 작동"
+           ·"Surface No-Line 원칙"·"Camp/Focus 공유 어휘")
+   License: CC BY 4.0 (발주서 §13.2)
+
+   채택 영역:
+     - Top Status Bar (.status-bar 와 stat tone 변종)
+     - Right Return Panel 의 .block / .block-h / .item / yeongi 강조선
+     - Center .next-move-box (Next move 표현)
+     - Bottom Activity Strip (.activity .event)
+
+   ⚠ 제외 (P0 / P1 위반):
+     - `border-radius: *` 사용 셀렉터 — §8-2 위반
+     - `outline: 1px solid *` (예: .term-station[data-active="true"]) — §8-1 위반
+     - `filter: blur(*)` 사용 셀렉터 (mission-card, drawer-backdrop, aurora) — §8-5 위반
+     - `.drawer*` 인터랙션 코드 — UX_EVAL §3.4 a11y 위반 (Drawer dialog 역할 부재)
+   ⚠ 의존: tokens.css 의 surface / on-surface / 의미 색채 토큰
+           motion.css 의 pip-pulse keyframe
+   ============================================================ */
+
+/* ============================================================
+   Top Status Bar
+   UX_EVAL §5 "5영역 IA 골격" 의 Top Status 영역 채택
+   ============================================================ */
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-5);
+  padding: var(--s-3) var(--s-5);
+  background: var(--surface);
+  position: relative;
+  z-index: 5;
+}
+.status-bar .project-tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--tertiary);
+  text-transform: uppercase;
+  padding: 4px 8px;
+  background: rgba(0, 220, 229, 0.08);
+}
+.status-bar .mission {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--on-surface);
+  flex: 1;
+}
+.status-bar .mission .ko {
+  font-family: var(--font-kr);
+  font-weight: 500;
+  color: var(--on-surface-dim);
+  margin-left: 12px;
+  font-size: 13px;
+}
+.status-bar .stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--on-surface-dim);
+  letter-spacing: 0.04em;
+}
+.status-bar .stat .dot {
+  width: 6px;
+  height: 6px;
+  display: inline-block;
+}
+
+/* === stat tone 변종 (의미 색채 분화) === */
+.stat[data-tone="active"] .dot { background: var(--modakbul); }
+.stat[data-tone="review"] .dot { background: var(--deungbul); }
+.stat[data-tone="block"]  .dot { background: var(--yeongi-edge); }
+.stat[data-tone="sync"]   .dot { background: var(--jangjak); }
+
+/* ============================================================
+   Right Return Panel — 복귀 패널 구조
+   UX_EVAL §5 analyst 평 "복귀 우선순위 시각 작동" 채택.
+   yeongi amber 강조선이 §7.3 "연기 → 등불" 순서를 시각적으로 작동시킴.
+   ============================================================ */
+.return-panel {
+  background: var(--surface-low);
+  padding: var(--s-5) var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+  overflow: hidden;
+  position: relative;
+}
+.return-panel .block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.return-panel .block-h {
+  font-family: var(--font-display);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--on-surface-faint);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.return-panel .block-h .count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--tertiary);
+}
+.return-panel .item {
+  background: var(--surface-high);
+  padding: 10px 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  position: relative;
+  cursor: pointer;
+  transition: background 180ms;
+}
+.return-panel .item:hover { background: var(--surface-highest); }
+.return-panel .item .pip { margin-top: 4px; flex-shrink: 0; }
+.return-panel .item .body {
+  display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1;
+}
+.return-panel .item .name {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--on-surface);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.return-panel .item .desc {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--on-surface-dim);
+  line-height: 1.4;
+}
+.return-panel .item .ko-desc {
+  font-family: var(--font-kr);
+  font-size: 11px;
+  color: var(--on-surface-faint);
+  margin-top: 2px;
+}
+
+/* === yeongi (연기) 우선순위 강조선 ===
+   UX_EVAL §5 "복귀 우선순위 시각 작동" 의 결정적 시그널. 채택. */
+.return-panel .item[data-state="yeongi"] {
+  background: linear-gradient(90deg, rgba(75, 224, 255, 0.12) 0%, var(--surface-high) 60%);
+}
+.return-panel .item[data-state="yeongi"]::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0;
+  width: 2px; height: 100%;
+  background: var(--yeongi-edge);
+}
+
+/* ============================================================
+   Next-Move Box — Center 의 Next move 단일 표현
+   UX_EVAL §5 가족룩 어휘 ("next-move") spec 1:1 일치 채택.
+   ============================================================ */
+.next-move-box {
+  background: var(--surface-high);
+  padding: var(--s-4);
+  position: relative;
+}
+.next-move-box .arrow {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--on-surface);
+  letter-spacing: 0.02em;
+  line-height: 1.6;
+}
+.next-move-box .arrow .step { color: var(--on-surface-dim); }
+.next-move-box .arrow .sep { color: var(--tertiary); margin: 0 6px; }
+.next-move-box .estimate {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--on-surface-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: 8px;
+}
+
+/* ============================================================
+   Bottom Activity Strip — 가족룩 어휘 (working-now / waiting-on-you)
+   UX_EVAL §5 "5영역 IA 골격" 의 Bottom Activity 영역 채택.
+   ============================================================ */
+.activity {
+  background: var(--surface);
+  padding: var(--s-3) var(--s-5);
+  display: flex;
+  align-items: center;
+  gap: var(--s-5);
+  overflow-x: auto;
+  border-top: 0;
+  height: 56px;
+  position: relative;
+  z-index: 5;
+}
+.activity .label-stamp {
+  font-family: var(--font-display);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--on-surface-faint);
+  flex-shrink: 0;
+}
+.activity .event {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 4px 8px;
+  background: var(--surface-low);
+  position: relative;
+}
+.activity .event .time {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--on-surface-faint);
+  letter-spacing: 0.04em;
+}
+.activity .event .text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--on-surface-dim);
+  letter-spacing: 0.02em;
+}
+.activity .event .text .who { color: var(--on-surface); }

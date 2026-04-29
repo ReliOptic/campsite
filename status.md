@@ -56,12 +56,14 @@
 - `campsite camp message` has 7 integration tests: send, reply, list, list --unresolved, resolve, flag, overview MSGS line. make check 172 unit + 45 integration = 217 total, all passing.
 - External design brief (`design/design-brief.md`), Active Camp copy(KR/EN), and v1.0 completion roadmap(`docs/completion-roadmap.md`) committed.
 - Claude Design handoff bundle landed at `design/handoff/2026-04-29-claude-design/` (13 files: HTML/CSS/JSX prototypes for F-1/F-2/F-3 + design system reference cards). Token HEX values match design brief §5.1 exactly. Standalone preview launcher (`start-preview.sh`) verified HTTP 200 for entry HTML + tokens.css + active-camp.jsx. Integration plan documented in `INTEGRATION.md` with 6-step migration path.
+- UX evaluation by 4-specialist parallel team(analyst·critic·code-reviewer·designer) reported, embedded at design/handoff/2026-04-29-claude-design/UX_EVAL_2026-04-29.md. Verdict: handoff fails v1.0 gate (P0 5건). Embed work suspended until M3 round.
 
 ## What Does Not Work Yet
 
 - No generated pixel art assets — `design/export/` is empty, Phaser storyworld is inactive.
 - Participant `last_seen` displays raw ISO 8601 timestamps (relative time conversion not implemented).
-- Handoff design system not yet adopted by `lib/camp.sh:506 camp_render()`. Migration plan in `design/handoff/2026-04-29-claude-design/INTEGRATION.md` Steps 1-6.
+- INTEGRATION.md self-validation results (especially §3.3 "9/10 compliance" claim) excluded from authoritative materials per UX_EVAL §3.3 (4 additional §8 violations identified).
+- Handoff design system not yet adopted by camp_render() — embed deferred until P0 5 items resolved (persona-scenario fit, §6 70% missing assets, §8 4 violations, WCAG AA 6 violations, external CDN dependencies).
 
 ## Blockers
 

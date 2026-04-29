@@ -2,17 +2,18 @@
 
 ## Next Action
 
-- task: 핸드오프 디자인 시스템 → camp_render 통합 Step 1 — 토큰 권위화
+- task: M3 라운드 디자이너 회신 발주서 송부 + P0 5항 해소 산출물 수령
 - priority: high
-- estimated-scope: small
-- entry-point: design/handoff/2026-04-29-claude-design/INTEGRATION.md §5.2 Step 1
-- precondition: make check 223/223 통과, 핸드오프 패키지 보관 완료, standalone preview HTTP 200 검증
-- roadmap: docs/completion-roadmap.md (v0.2.0 → v1.0 단계별 계획)
-- preview: bash design/handoff/2026-04-29-claude-design/start-preview.sh (브라우저로 시안 즉시 검토)
+- estimated-scope: medium (1~3주)
+- entry-point: design/handoff/2026-04-29-claude-design/M3_REORDER_BRIEF.md
+- precondition: UX_EVAL §3 P0 5항 합의 완료
+- blocker: 본체 임베드(INTEGRATION.md §5.2 Step 1~6)는 M3 산출물 수령 전 진행 금지
+- reference: design/handoff/2026-04-29-claude-design/UX_EVAL_2026-04-29.md (4인 자문팀 평가 종합 보고서)
+- roadmap: docs/completion-roadmap.md Phase 5 (1차분 평가 후 보류 상태)
 
 ## Context for Next Session
 
-Phase 4 완료 + 기능 점검 완료 + 디자인 발주서 + Active Camp 카피 + completion-roadmap 작성 완료. Claude Design 핸드오프 1차분(13파일: HTML/4 CSS/5 JSX) 도착, `design/handoff/2026-04-29-claude-design/`에 영구 보관. 핸드오프 토큰이 발주서 §5.1과 정확히 일치(Primary `#cdc1e0` / Tertiary `#00dce5` / 화로 5종 색채 100%). standalone preview launcher 동작 검증 완료(HTTP 200 ×3). INTEGRATION.md에 6단계 통합 계획 명시. 다음 작업: Step 1 토큰 권위화(`design/system/tokens.css` 분리).
+Phase 4 완료 + 디자인 발주서 + Active Camp 카피 + completion-roadmap 작성 완료. Claude Design 1차 핸드오프(13파일) 도착했으나 4인 자문팀(analyst·critic·code-reviewer·designer) 병렬 평가 결과 v1.0 임베드 부적격 판정(P0 5항: 페르소나-시나리오 불일치 / §6 70% 미수령 / §8 4항 위반 / WCAG AA 6항 미준수 / 외부 CDN 의존). 종합 보고서: `design/handoff/2026-04-29-claude-design/UX_EVAL_2026-04-29.md`. INTEGRATION.md §3.3 자기 검증("9/10 준수")은 권위 자료에서 제외, 위상 재정의 박스 추가 완료. 본체 임베드 작업 보류, M3 라운드 재발주 단계로 전환. 임베드 예상 가능 시점: 2026-05-20 ± 1주.
 
 ## Open Questions
 
@@ -44,3 +45,4 @@ Phase 4 완료 + 기능 점검 완료 + 디자인 발주서 + Active Camp 카피
 | 2026-04-28 | claude-sonnet | 기능 점검: participant list IFS 탭 붕괴 → awk 교체, remove camp_log_event undefined → camp_event_append, ${2:-} positional arg 수정 | make check 223/223, origin push 완료 |
 | 2026-04-29 | claude-sonnet | 디자인 발주서·Active Camp 카피·v1.0 completion roadmap 3종 작성 | design-brief.md 599L · copy-active-camp.md 291L · completion-roadmap.md 522L commit/push 완료 |
 | 2026-04-29 | claude-sonnet | Claude Design 핸드오프 1차분 영구 보관 + standalone preview 검증 + INTEGRATION 6단계 통합 계획 작성 | 13 files in design/handoff/2026-04-29-claude-design/, HTTP 200 ×3 검증, 토큰 발주서 §5.1과 100% 일치 |
+| 2026-04-29 | claude-sonnet | UX 평가 자문팀 4인(analyst·critic·code-reviewer·designer) 병렬 평가 + 종합 보고서(UX_EVAL_2026-04-29.md) 작성 | 4인 합의: v1.0 임베드 부적격 P0 5항. 임베드 작업 보류, M3 재발주 권고 |

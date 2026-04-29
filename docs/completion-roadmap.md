@@ -160,9 +160,41 @@ Campsite는 다음 정서적·인지적 조건을 만족시킨다.
 
 ### Phase 5 — Visual Identity Production (자산 생산)
 
-**Status**: in_progress (2026-04-29 1차분 도착)
+**Status**: in_progress (1차분 평가 후 보류)
 
 **1차 핸드오프 (2026-04-29)**: Claude Design 도구로 산출된 LoFi prototype 13파일이 `design/handoff/2026-04-29-claude-design/`에 도착. F-1/F-2/F-3 시안 + 디자인 시스템 레퍼런스 + 5종 화로 + 6종 동물 sprite + 환경 테마 3종 응용 팔레트 포함. 토큰 발주서 §5.1과 100% 일치. 통합 계획은 `design/handoff/2026-04-29-claude-design/INTEGRATION.md`.
+
+**평가 결과 (2026-04-29)**: 4인 자문팀(analyst·critic·code-reviewer·designer) 병렬 평가 결과 v1.0 임베드 부적격 판정. 종합 보고서: `design/handoff/2026-04-29-claude-design/UX_EVAL_2026-04-29.md`.
+
+| 평가 영역 | 점수 (0-10) | 출처 |
+|---|---|---|
+| 페르소나 충족 | 5 | analyst |
+| §6 산출물 충족도 | **3** | critic |
+| §8 절대 금지 준수 | 4 | critic |
+| 접근성 (WCAG 2.2 AA) | **3** | code-reviewer |
+| Dave the Diver 도달도 | **3** | designer |
+| 참고 좌표 도달도 | **3** | critic |
+| 평균 | 5.7 | 종합 |
+
+P0 차단 사유 5항 요약:
+1. 페르소나-시나리오 불일치 (F-2 영웅 시안이 `payments-v1` 단일 시나리오 고착, 희원 페르소나 시험 불통과)
+2. §6 산출물 70% 미수령 (PNG sprite 0건, 동물 sprite sheet 0건, 환경 PNG·768px 폴백·manifest 부재)
+3. §8 절대 금지 4항 위반 (border-radius·blur·텍스트 절단·1px outline)
+4. WCAG 2.2 AA 6항 미준수 (키보드·포커스·이름·색상비의존·콘트라스트·alt-text)
+5. 외부 의존 위험 (React/Babel CDN, Google Fonts CDN, `text/babel` production 부적합)
+
+**M3 재발주 필요 — 임베드는 M3 산출물 수령 후**.
+
+**M3 라운드 산출물 명세 (UX_EVAL §6.2)**:
+
+| 산출 | 카테고리 | 우선순위 |
+|---|---|---|
+| 시나리오 D(희원, 로그인 페이지) F-2 변형 시안 | F | P0 |
+| §8 절대 금지 4항 보정 (border-radius, blur 정책, 텍스트 절단, 1px outline) | 전체 | P0 |
+| 화로 PNG 6점 (PNG-8/24, 합산 ≤600KB) | A | P0 |
+| 동물 sprite sheet 6종 × 5상태 × 4프레임 (총 120프레임) | B | P0 |
+| 768px 폴백 시안 (F-1·F-2·F-3) | F | P0 |
+| manifest.json + SHA-256 + 사용 가이드 PDF | H | P0 |
 
 **Goal**: 캠프 표면이 시각 정체성을 갖는다. 픽셀 아트 자산이 실제로 적재되어 SVG 폴백을 대체한다.
 
@@ -186,6 +218,7 @@ Campsite는 다음 정서적·인지적 조건을 만족시킨다.
 - 모든 자산은 PNG-8 또는 PNG-24, 합산 600KB 미만
 - `design/export/manifest.json`에 모든 자산이 SHA-256 해시와 함께 등록된다
 - `prefers-reduced-motion` 설정에서도 자산이 정상 표시된다
+- 본 단계는 UX_EVAL §3 P0 5항이 모두 해소될 때까지 in_progress로 유지한다.
 
 **Risk**:
 - AI 이미지 생성기 외부 의존(주요)
